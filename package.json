@@ -1,0 +1,38 @@
+{
+  "name": "event-management-platform",
+  "version": "1.0.0",
+  "description": "Comprehensive event management platform with registration, attendance tracking, and certification features",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend && npm install --workspace=shared",
+    "clean": "rimraf node_modules frontend/node_modules backend/node_modules shared/node_modules frontend/dist backend/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "rimraf": "^5.0.5"
+  },
+  "keywords": [
+    "event-management",
+    "registration",
+    "attendance",
+    "certificates",
+    "qr-codes",
+    "react",
+    "node.js",
+    "typescript",
+    "supabase"
+  ],
+  "author": "",
+  "license": "MIT"
+}

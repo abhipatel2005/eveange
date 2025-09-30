@@ -1,0 +1,5 @@
+.env
+node_modules/
+docs/
+logs/
+client_secret_333595884831-8k36te19uj8e0sda9tpr2aqhfna5a2i3.apps.googleusercontent.com.json
