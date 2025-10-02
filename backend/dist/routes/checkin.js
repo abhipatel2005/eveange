@@ -319,6 +319,42 @@ router.post("/events/:eventId/check-in", authenticateToken, async (req, res) => 
         catch (error) {
             return res.status(400).json({ error: "Invalid QR code format" });
         }
+        // Check if event has ended - prevent check-ins after event end
+        const { data: eventDetails, error: eventDetailsError } = await supabase
+            .from("events")
+            .select("id, title, start_date, end_date, status")
+            .eq("id", eventId)
+            .single();
+        if (eventDetailsError || !eventDetails) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        // Check if event has ended
+        const now = new Date();
+        const eventEndDate = new Date(eventDetails.end_date);
+        if (now > eventEndDate) {
+            return res.status(400).json({
+                error: "Check-in not allowed: Event has ended",
+                eventEndDate: eventDetails.end_date,
+                message: `This event ended on ${eventEndDate.toLocaleString()}. QR scanning is no longer available.`,
+            });
+        }
+        // Note: Early check-in restriction removed - events can decide their own check-in policies
+        // Future enhancement: Add per-event setting for "allow_early_checkin" or "checkin_start_time"
+        // Example:
+        // if (eventDetails.restrict_early_checkin) {
+        //   const eventStartDate = new Date(eventDetails.start_date);
+        //   if (now < eventStartDate) {
+        //     return res.status(400).json({ error: "Event hasn't started yet" });
+        //   }
+        // }
+        // Check if event is cancelled or not active
+        if (eventDetails.status !== "published") {
+            return res.status(400).json({
+                error: "Check-in not allowed: Event is not active",
+                eventStatus: eventDetails.status,
+                message: "This event is not currently accepting check-ins.",
+            });
+        }
         // Find the registration
         const { data: registration, error: regError } = await supabase
             .from("registrations")

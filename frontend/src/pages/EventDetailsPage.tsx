@@ -63,10 +63,47 @@ const EventDetailsPage: React.FC = () => {
         if (response.success && response.data) {
           setEvent(response.data.event);
         } else {
-          setError(response.error || "Event not found");
+          if (
+            response.error?.includes("not found") ||
+            response.error?.includes("404")
+          ) {
+            setError(
+              "This event could not be found. It may have been deleted or the link is incorrect."
+            );
+          } else if (
+            response.error?.includes("permission") ||
+            response.error?.includes("access")
+          ) {
+            setError(
+              "You don't have permission to view this event. It may be private or restricted."
+            );
+          } else {
+            setError(response.error || "Event not found");
+          }
         }
       } catch (err) {
-        setError("Failed to load event details");
+        if (err instanceof Error && "response" in err) {
+          const apiError = err as any;
+          if (apiError.status === 404) {
+            setError(
+              "This event could not be found. It may have been deleted or the link is incorrect."
+            );
+          } else if (apiError.status === 403) {
+            setError(
+              "You don't have permission to view this event. It may be private or restricted."
+            );
+          } else if (apiError.status === 401) {
+            setError("Please log in to view this event.");
+          } else {
+            setError(
+              "An unexpected error occurred while loading the event. Please try again."
+            );
+          }
+        } else {
+          setError(
+            "Unable to connect to the server. Please check your internet connection and try again."
+          );
+        }
         console.error("Event details error:", err);
       } finally {
         setLoading(false);
@@ -241,7 +278,7 @@ const EventDetailsPage: React.FC = () => {
               </span>
               {event.is_paid && (
                 <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
-                  ${event.price}
+                  ₹{event.price}
                 </span>
               )}
             </div>
@@ -453,7 +490,7 @@ const EventDetailsPage: React.FC = () => {
                   {event.is_paid ? (
                     <div className="mb-4">
                       <span className="text-2xl font-bold text-gray-900">
-                        ${event.price}
+                        ₹{event.price}
                       </span>
                       <span className="text-sm text-gray-600 ml-1">
                         per ticket

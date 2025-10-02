@@ -343,14 +343,14 @@ const CreateEventPage: React.FC = () => {
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                    $
+                    ₹
                   </span>
                   <input
                     {...register("price", { valueAsNumber: true })}
                     type="number"
                     id="price"
                     min="0"
-                    step="0.01"
+                    step="0.5"
                     className={`input pl-8 ${
                       errors.price ? "border-red-500" : ""
                     }`}

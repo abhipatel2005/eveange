@@ -3,11 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuthStore } from "../store/authStore";
 import { EventService, Event } from "../api/events";
 import { RegistrationService } from "../api/registrations";
+import { useAuthStore } from "../store/authStore";
+import { handleError, ErrorPatterns } from "../utils/errorHandling";
 
-// Basic registration form schema
+// Define the form schema
 const RegistrationFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -120,7 +121,9 @@ const RegistrationFormPage: React.FC = () => {
         setError(response.error || "Failed to register for event");
       }
     } catch (err) {
-      setError("Failed to register for event. Please try again.");
+      // Use the new error handling utility for consistent, user-friendly messages
+      const errorMessage = handleError(err, ErrorPatterns.REGISTRATION);
+      setError(errorMessage);
       console.error("Registration error:", err);
     } finally {
       setSubmitting(false);
@@ -562,7 +565,7 @@ const RegistrationFormPage: React.FC = () => {
                 Registering...
               </div>
             ) : event.is_paid ? (
-              `Register & Pay $${event.price}`
+              `Register & Pay ₹${event.price}`
             ) : (
               "Register for Event"
             )}

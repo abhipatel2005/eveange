@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 export interface TokenPayload {
@@ -10,11 +10,11 @@ export interface TokenPayload {
 export class AuthUtils {
   static generateTokens(payload: TokenPayload) {
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: process.env.JWT_EXPIRE || "1h",
+      expiresIn: "1h",
     });
 
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRE || "7d",
+      expiresIn: "7d",
     });
 
     return { accessToken, refreshToken };

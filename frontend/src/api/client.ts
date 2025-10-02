@@ -63,6 +63,19 @@ export class ApiClient {
 
       if (!response.ok) {
         console.log("❌ Request failed:", response.status, data);
+
+        // Handle token expiration
+        if (response.status === 401 && data.code === "TOKEN_EXPIRED") {
+          console.log(
+            "🔓 Token expired, clearing auth and redirecting to login"
+          );
+          this.handleTokenExpiration();
+          throw new ApiError(response.status, {
+            ...data,
+            shouldRedirectToLogin: true,
+          });
+        }
+
         throw new ApiError(response.status, data);
       }
 
@@ -107,6 +120,22 @@ export class ApiClient {
     }
     console.log("No token found in store or localStorage");
     return null;
+  }
+
+  private handleTokenExpiration(): void {
+    console.log("🔓 Handling token expiration");
+
+    // Clear auth from store
+    const authStore = useAuthStore.getState();
+    authStore.clearAuth();
+
+    // Show user-friendly message
+    authStore.setError("Your session has expired. Please log in again.");
+
+    // Redirect to login page after a short delay
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 1000);
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {

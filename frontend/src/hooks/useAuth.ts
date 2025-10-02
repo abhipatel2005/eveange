@@ -36,10 +36,37 @@ export const useAuth = () => {
           throw new Error(response.error || "Login failed");
         }
       } catch (error) {
-        const errorMessage =
-          error instanceof ApiError
-            ? error.response.error || "Login failed"
-            : "An unexpected error occurred";
+        let errorMessage = "An unexpected error occurred";
+
+        if (error instanceof ApiError) {
+          if (error.status === 401) {
+            errorMessage =
+              "Invalid email or password. Please check your credentials and try again.";
+          } else if (error.status === 403) {
+            errorMessage =
+              "Your account has been disabled. Please contact support for assistance.";
+          } else if (error.status === 429) {
+            errorMessage =
+              "Too many login attempts. Please wait a few minutes and try again.";
+          } else if (error.status === 500) {
+            errorMessage =
+              "Server error occurred. Please try again in a few moments.";
+          } else {
+            errorMessage =
+              error.response.error ||
+              "Login failed. Please check your credentials.";
+          }
+        } else if (error instanceof Error) {
+          if (
+            error.message.includes("network") ||
+            error.message.includes("fetch")
+          ) {
+            errorMessage =
+              "Unable to connect to the server. Please check your internet connection.";
+          } else {
+            errorMessage = error.message || "Login failed. Please try again.";
+          }
+        }
 
         setError(errorMessage);
         toast.error(errorMessage);
@@ -68,10 +95,43 @@ export const useAuth = () => {
           throw new Error(response.error || "Registration failed");
         }
       } catch (error) {
-        const errorMessage =
-          error instanceof ApiError
-            ? error.response.error || "Registration failed"
-            : "An unexpected error occurred";
+        let errorMessage = "An unexpected error occurred";
+
+        if (error instanceof ApiError) {
+          if (error.status === 409) {
+            errorMessage =
+              "An account with this email already exists. Please try logging in instead.";
+          } else if (error.status === 400) {
+            if (error.response.error?.includes("email")) {
+              errorMessage = "Please provide a valid email address.";
+            } else if (error.response.error?.includes("password")) {
+              errorMessage = "Password must be at least 8 characters long.";
+            } else if (error.response.error?.includes("name")) {
+              errorMessage = "Please provide your full name.";
+            } else {
+              errorMessage =
+                error.response.error ||
+                "Please check your information and try again.";
+            }
+          } else if (error.status === 500) {
+            errorMessage =
+              "Server error occurred. Please try again in a few moments.";
+          } else {
+            errorMessage =
+              error.response.error || "Registration failed. Please try again.";
+          }
+        } else if (error instanceof Error) {
+          if (
+            error.message.includes("network") ||
+            error.message.includes("fetch")
+          ) {
+            errorMessage =
+              "Unable to connect to the server. Please check your internet connection.";
+          } else {
+            errorMessage =
+              error.message || "Registration failed. Please try again.";
+          }
+        }
 
         setError(errorMessage);
         toast.error(errorMessage);

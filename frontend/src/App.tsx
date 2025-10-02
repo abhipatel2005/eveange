@@ -14,7 +14,8 @@ import RegistrationFormBuilder from "./pages/RegistrationFormBuilder";
 import MyRegistrationsPage from "./pages/MyRegistrationsPage";
 import EventRegistrationsPage from "./pages/EventRegistrationsPage";
 import AttendancePage from "./pages/AttendancePage";
-import CertificatesPage from "./pages/CertificatesPage";
+import CertificateManagementPage from "./pages/CertificateManagementPage";
+import CertificateVerificationPage from "./pages/CertificateVerificationPage";
 import CheckInPage from "./pages/CheckInPage";
 import ParticipantTicketPage from "./pages/ParticipantTicketPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -89,9 +90,13 @@ function App() {
           path="/events/:id/certificates"
           element={
             <ProtectedRoute requireOrganizer>
-              <CertificatesPage />
+              <CertificateManagementPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/certificate/verify"
+          element={<CertificateVerificationPage />}
         />
 
         {/* Admin Dashboard */}

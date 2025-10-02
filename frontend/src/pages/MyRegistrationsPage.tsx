@@ -49,7 +49,27 @@ const MyRegistrationsPage: React.FC = () => {
       fetchRegistrations();
     } catch (error) {
       console.error("Failed to cancel registration:", error);
-      alert("Failed to cancel registration. Please try again.");
+
+      let errorMessage = "Failed to cancel registration. Please try again.";
+      if (error instanceof Error && "response" in error) {
+        const apiError = error as any;
+        if (apiError.status === 400) {
+          errorMessage =
+            "Cannot cancel registration for this event. It may have already started or the cancellation deadline has passed.";
+        } else if (apiError.status === 404) {
+          errorMessage =
+            "Registration not found. It may have already been cancelled.";
+        } else if (apiError.status === 403) {
+          errorMessage =
+            "You don't have permission to cancel this registration.";
+        } else {
+          errorMessage =
+            apiError.response?.error ||
+            "Failed to cancel registration. Please try again.";
+        }
+      }
+
+      alert(errorMessage);
     }
   };
 
@@ -188,7 +208,7 @@ const MyRegistrationsPage: React.FC = () => {
                       {/* Price info for paid events */}
                       {event.is_paid && event.price && (
                         <div className="mt-3 text-sm text-gray-600">
-                          Event Price: ${event.price}
+                          Event Price: ₹{event.price}
                         </div>
                       )}
                     </div>

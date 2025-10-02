@@ -29,6 +29,7 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
   const { accessToken } = useAuthStore();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [hasGmailPermission, setHasGmailPermission] = useState(false);
   const [checkingGmailPermission, setCheckingGmailPermission] = useState(false);
@@ -48,6 +49,7 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
 
   const fetchStaff = async () => {
     try {
+      setError(null);
       const response = await fetch(`/api/checkin/events/${eventId}/staff`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -61,9 +63,31 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
       } else {
         console.error("Failed to fetch staff:", response.status);
         setStaff([]);
+
+        if (response.status === 403) {
+          setError(
+            "You don't have permission to view staff for this event. Only event organizers and administrators can access staff management."
+          );
+        } else if (response.status === 404) {
+          setError(
+            "Event not found. Please check if the event still exists and refresh the page."
+          );
+        } else if (response.status === 401) {
+          setError(
+            "Your session has expired. Please log in again to view staff information."
+          );
+        } else {
+          setError(
+            "Unable to load staff information. Please try refreshing the page."
+          );
+        }
       }
     } catch (error) {
       console.error("Error fetching staff:", error);
+      setStaff([]);
+      setError(
+        "Unable to connect to the server. Please check your internet connection and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -156,11 +180,43 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
         );
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to add staff member");
+        let errorMessage = "Failed to add staff member";
+
+        if (response.status === 400) {
+          if (
+            error.error?.includes("already exists") ||
+            error.error?.includes("duplicate")
+          ) {
+            errorMessage =
+              "This person is already a staff member for this event.";
+          } else if (error.error?.includes("validation") || error.details) {
+            errorMessage =
+              "Please check that the email address and name are valid and try again.";
+          } else {
+            errorMessage = error.error || "Invalid staff information provided.";
+          }
+        } else if (response.status === 403) {
+          errorMessage =
+            "You don't have permission to add staff members to this event. Only event organizers and administrators can manage staff.";
+        } else if (response.status === 404) {
+          errorMessage =
+            "Event not found. Please refresh the page and try again.";
+        } else if (response.status === 500) {
+          errorMessage =
+            "Server error occurred while adding staff member. Please try again in a few moments.";
+        } else {
+          errorMessage =
+            error.error ||
+            "An unexpected error occurred while adding the staff member.";
+        }
+
+        alert(errorMessage);
       }
     } catch (error) {
       console.error("Error adding staff:", error);
-      alert("Failed to add staff member");
+      alert(
+        "Unable to connect to the server. Please check your internet connection and try again."
+      );
     }
   };
 
@@ -186,11 +242,30 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
         alert("Staff member removed successfully");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to remove staff member");
+        let errorMessage = "Failed to remove staff member";
+
+        if (response.status === 403) {
+          errorMessage =
+            "You don't have permission to remove staff members from this event. Only event organizers and administrators can manage staff.";
+        } else if (response.status === 404) {
+          errorMessage =
+            "Staff member not found. They may have already been removed or the event information is outdated.";
+        } else if (response.status === 400) {
+          errorMessage =
+            "Cannot remove this staff member. They may be currently checked in or have active sessions.";
+        } else {
+          errorMessage =
+            error.error ||
+            "An unexpected error occurred while removing the staff member.";
+        }
+
+        alert(errorMessage);
       }
     } catch (error) {
       console.error("Error removing staff:", error);
-      alert("Failed to remove staff member");
+      alert(
+        "Unable to connect to the server. Please check your internet connection and try again."
+      );
     }
   };
 
@@ -377,6 +452,22 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
         {loading ? (
           <div className="px-6 py-8 text-center text-gray-500">
             <p>Loading staff...</p>
+          </div>
+        ) : error ? (
+          <div className="px-6 py-8 text-center">
+            <div className="text-red-600 mb-4">
+              <Shield className="h-12 w-12 text-red-300 mx-auto mb-4" />
+              <p className="font-medium">{error}</p>
+            </div>
+            <button
+              onClick={() => {
+                setError(null);
+                fetchStaff();
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Try Again
+            </button>
           </div>
         ) : staff.length === 0 ? (
           <div className="px-6 py-8 text-center text-gray-500">

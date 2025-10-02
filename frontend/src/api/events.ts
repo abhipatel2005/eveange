@@ -11,6 +11,7 @@ export interface Event {
   capacity: number;
   banner_url?: string;
   visibility: "public" | "private" | "invite-only";
+  status?: "draft" | "published" | "cancelled";
   registration_deadline?: string;
   is_paid: boolean;
   price?: number;

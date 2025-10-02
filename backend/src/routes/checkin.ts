@@ -170,13 +170,14 @@ router.post(
       }
 
       // Create staff assignment
+      // Permissions are already in array format from frontend
       const { data: assignment, error: assignmentError } = await supabase
         .from("staff_assignments")
         .insert({
           staff_id: staffUser.id,
           event_id: eventId,
           assigned_by: userId,
-          permissions,
+          permissions: permissions,
         })
         .select("*")
         .single();
@@ -206,6 +207,116 @@ router.post(
   }
 );
 
+// Get staff members for an event
+router.get(
+  "/events/:eventId/staff",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const eventId = req.params.eventId;
+      const userId = req.user!.id;
+
+      console.log("👥 Fetching staff for event:", eventId, "user:", userId);
+      console.log("👤 User object:", req.user);
+
+      // Check if user is the event organizer or admin
+      const { data: event, error: eventError } = await supabase
+        .from("events")
+        .select("id, organizer_id")
+        .eq("id", eventId)
+        .single();
+
+      console.log("🎪 Event lookup result:", { event, eventError });
+
+      if (eventError || !event) {
+        console.log("❌ Event not found");
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Only organizer or admin can view staff list
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      console.log("👤 User role lookup:", { user, userError });
+
+      const isOrganizer = event.organizer_id === userId;
+      const isAdmin = user?.role === "admin";
+
+      console.log("🔐 Authorization check:", {
+        isOrganizer,
+        isAdmin,
+        eventOrganizerId: event.organizer_id,
+        userId,
+      });
+
+      if (!isOrganizer && !isAdmin) {
+        console.log("❌ Access denied - not organizer or admin");
+        return res.status(403).json({
+          error:
+            "Access denied. Only event organizers and admins can view staff.",
+        });
+      }
+
+      // Fetch staff assignments with user details
+      const { data: staffAssignments, error: staffError } = await supabase
+        .from("staff_assignments")
+        .select(
+          `
+          id,
+          permissions,
+          created_at,
+          assigned_by,
+          staff:users!staff_assignments_staff_id_fkey (
+            id,
+            name,
+            email,
+            last_login_at
+          ),
+          assigned_by:users!staff_assignments_assigned_by_fkey (
+            name,
+            email
+          )
+        `
+        )
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false });
+
+      if (staffError) {
+        console.error("Error fetching staff:", staffError);
+        return res.status(500).json({ error: "Failed to fetch staff" });
+      }
+
+      // Transform the data to match the frontend interface
+      const staff = (staffAssignments || []).map((assignment: any) => ({
+        id: assignment.id,
+        permissions: {
+          can_check_in: Array.isArray(assignment.permissions)
+            ? assignment.permissions.includes("check-in")
+            : assignment.permissions?.can_check_in || false,
+          can_view_stats: Array.isArray(assignment.permissions)
+            ? assignment.permissions.includes("view-stats")
+            : assignment.permissions?.can_view_stats || false,
+        },
+        assigned_at: assignment.created_at, // Map created_at to assigned_at for frontend
+        user: assignment.staff,
+        assigned_by_user: assignment.assigned_by,
+      }));
+
+      console.log("✅ Staff fetched successfully:", staff.length, "members");
+      res.json({ success: true, staff });
+    } catch (error) {
+      console.error("❌ Get staff error:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
 // Get check-in stats for an event
 router.get(
   "/events/:eventId/check-in-stats",
@@ -227,7 +338,6 @@ router.get(
         .from("events")
         .select("id, organizer_id")
         .eq("id", eventId)
-        .eq("is_active", true)
         .single();
 
       if (eventError || !eventAccess) {
@@ -401,6 +511,48 @@ router.post(
         }
       } catch (error) {
         return res.status(400).json({ error: "Invalid QR code format" });
+      }
+
+      // Check if event has ended - prevent check-ins after event end
+      const { data: eventDetails, error: eventDetailsError } = await supabase
+        .from("events")
+        .select("id, title, start_date, end_date, status")
+        .eq("id", eventId)
+        .single();
+
+      if (eventDetailsError || !eventDetails) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if event has ended
+      const now = new Date();
+      const eventEndDate = new Date(eventDetails.end_date);
+
+      if (now > eventEndDate) {
+        return res.status(400).json({
+          error: "Check-in not allowed: Event has ended",
+          eventEndDate: eventDetails.end_date,
+          message: `This event ended on ${eventEndDate.toLocaleString()}. QR scanning is no longer available.`,
+        });
+      }
+
+      // Note: Early check-in restriction removed - events can decide their own check-in policies
+      // Future enhancement: Add per-event setting for "allow_early_checkin" or "checkin_start_time"
+      // Example:
+      // if (eventDetails.restrict_early_checkin) {
+      //   const eventStartDate = new Date(eventDetails.start_date);
+      //   if (now < eventStartDate) {
+      //     return res.status(400).json({ error: "Event hasn't started yet" });
+      //   }
+      // }
+
+      // Check if event is cancelled or not active
+      if (eventDetails.status !== "published") {
+        return res.status(400).json({
+          error: "Check-in not allowed: Event is not active",
+          eventStatus: eventDetails.status,
+          message: "This event is not currently accepting check-ins.",
+        });
       }
 
       // Find the registration

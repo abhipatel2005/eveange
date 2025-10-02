@@ -52,12 +52,16 @@ export default function QRScannerPage() {
         setEventsLoading(true);
         const response = await EventService.getMyEvents();
         if (response.success && response.data) {
-          // Filter to only active and upcoming events
+          // Filter to show events that haven't ended yet (allow flexible start times)
           const availableEvents = response.data.events.filter(
             (event: Event) => {
               const now = new Date();
               const eventEnd = new Date(event.end_date);
-              return eventEnd >= now; // Show current and future events
+
+              return (
+                now <= eventEnd && // Only show events that haven't ended
+                (!event.status || event.status === "published") // Only published events (status is optional)
+              );
             }
           );
           setEvents(availableEvents);
