@@ -1,0 +1,60 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Deploy to Azure VM
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.PRIVATE_KEY }}
+        script: |
+          echo "🚀 Starting deployment..."
+          
+          # Navigate to app directory
+          cd ~/apps/evange
+          
+          # Pull latest code
+          git pull origin main
+          
+          # Update backend
+          echo "📦 Updating backend..."
+          cd backend
+          npm ci
+          npm run build
+          
+          # Restart backend with PM2
+          echo "🔄 Restarting backend..."
+          pm2 restart evange-backend || pm2 start dist/server.js --name "evange-backend"
+          
+          # Update frontend
+          echo "📦 Building frontend..."
+          cd ../frontend
+          npm ci
+          npm run build
+          
+          # Restart nginx
+          echo "🔧 Restarting nginx..."
+          sudo systemctl restart nginx
+          
+          echo "✅ Deployment complete!"
+          
+          # Show status
+          pm2 list
