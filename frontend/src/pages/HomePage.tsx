@@ -142,7 +142,7 @@ const HomePage: React.FC = () => {
               </p>
               <Link
                 to="/register"
-                className="btn-primary w-full text-center block"
+                className="btn btn-primary w-full text-center block"
               >
                 Start Your Free Trial
               </Link>

@@ -101,12 +101,13 @@ export class RegistrationController {
                 });
                 return;
             }
-            // Check if user is already registered
+            // Check if user is already registered (excluding cancelled registrations)
             const { data: existingRegistration } = await supabase
                 .from("registrations")
-                .select("id")
+                .select("id, status")
                 .eq("event_id", eventId)
                 .eq("user_id", userId)
+                .neq("status", "cancelled")
                 .single();
             if (existingRegistration) {
                 res.status(409).json({
@@ -128,6 +129,9 @@ export class RegistrationController {
                 });
                 return;
             }
+            // For paid events, create registration with pending payment status
+            const registrationStatus = event.is_paid ? "pending" : "confirmed";
+            const paymentStatus = event.is_paid ? "pending" : "not_required";
             // Create registration first to get the ID
             const { data: registration, error: registrationError } = await supabase
                 .from("registrations")
@@ -137,12 +141,13 @@ export class RegistrationController {
                 email: userEmail,
                 name: userName,
                 responses: validatedData.formData,
-                status: "confirmed",
+                status: registrationStatus,
+                payment_status: paymentStatus,
                 qr_code: "", // We'll update this after getting the ID
             })
                 .select(`
-          id, status, created_at, responses, qr_code, email, name,
-          event:event_id(id, title, start_date, location),
+          id, status, payment_status, created_at, responses, qr_code, email, name,
+          event:event_id(id, title, start_date, location, is_paid, price),
           user:user_id(id, name, email)
         `)
                 .single();
@@ -167,55 +172,67 @@ export class RegistrationController {
             }
             // Update the registration object with the QR code
             registration.qr_code = qrCode;
-            // Send registration confirmation email
-            console.log("📧 Attempting to send registration confirmation email to:", userEmail);
-            try {
-                // Check if the organizer has granted Gmail permission for delegated sending
-                let organizerUserId = null;
-                if (event?.organizer_id) {
-                    organizerUserId = event.organizer_id;
+            // Send registration confirmation email only for free events
+            // For paid events, email will be sent after payment confirmation
+            if (!event.is_paid) {
+                console.log("📧 Attempting to send registration confirmation email to:", userEmail);
+                try {
+                    // Check if the organizer has granted Gmail permission for delegated sending
+                    let organizerUserId = null;
+                    if (event?.organizer_id) {
+                        organizerUserId = event.organizer_id;
+                    }
+                    const freshTokenData = organizerUserId
+                        ? await getFreshAccessToken(organizerUserId)
+                        : null;
+                    if (freshTokenData) {
+                        console.log("🔑 Using organizer-delegated Gmail sending from:", freshTokenData.email);
+                        console.log("🎫 Has access token:", !!freshTokenData.accessToken);
+                        console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
+                    }
+                    else {
+                        console.log("⚠️ No organizer Gmail permission, using system email");
+                    }
+                    // Prepare email template data
+                    const eventDate = new Date(event.start_date).toLocaleDateString();
+                    const eventTime = new Date(event.start_date).toLocaleTimeString();
+                    const ticketUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/ticket/${registration.id}`;
+                    const emailData = {
+                        participantName: registration.name || "Participant",
+                        eventTitle: event.title,
+                        eventDate: eventDate,
+                        eventTime: eventTime,
+                        eventLocation: event.location || "TBA",
+                        qrCode: registration.qr_code,
+                        registrationId: registration.id,
+                        ticketUrl: ticketUrl,
+                    };
+                    const emailSent = await EmailService.sendRegistrationConfirmation(userEmail, emailData, freshTokenData?.email, freshTokenData?.accessToken, freshTokenData?.refreshToken);
+                    if (emailSent) {
+                        console.log(`✅ Registration confirmation sent successfully to: ${userEmail}`);
+                    }
+                    else {
+                        console.log(`⚠️ Registration confirmation could not be sent to: ${userEmail} (but registration was created)`);
+                    }
                 }
-                const freshTokenData = organizerUserId
-                    ? await getFreshAccessToken(organizerUserId)
-                    : null;
-                if (freshTokenData) {
-                    console.log("🔑 Using organizer-delegated Gmail sending from:", freshTokenData.email);
-                    console.log("🎫 Has access token:", !!freshTokenData.accessToken);
-                    console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
-                }
-                else {
-                    console.log("⚠️ No organizer Gmail permission, using system email");
-                }
-                // Prepare email template data
-                const eventDate = new Date(event.start_date).toLocaleDateString();
-                const eventTime = new Date(event.start_date).toLocaleTimeString();
-                const ticketUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/ticket/${registration.id}`;
-                const emailData = {
-                    participantName: registration.name || "Participant",
-                    eventTitle: event.title,
-                    eventDate: eventDate,
-                    eventTime: eventTime,
-                    eventLocation: event.location || "TBA",
-                    qrCode: registration.qr_code,
-                    registrationId: registration.id,
-                    ticketUrl: ticketUrl,
-                };
-                const emailSent = await EmailService.sendRegistrationConfirmation(userEmail, emailData, freshTokenData?.email, freshTokenData?.accessToken, freshTokenData?.refreshToken);
-                if (emailSent) {
-                    console.log(`✅ Registration confirmation sent successfully to: ${userEmail}`);
-                }
-                else {
-                    console.log(`⚠️ Registration confirmation could not be sent to: ${userEmail} (but registration was created)`);
+                catch (emailError) {
+                    console.error("📧 Email sending failed:", emailError);
+                    // Don't fail the whole operation if email fails
                 }
             }
-            catch (emailError) {
-                console.error("📧 Email sending failed:", emailError);
-                // Don't fail the whole operation if email fails
+            else {
+                console.log("💳 Paid event - confirmation email will be sent after payment completion");
             }
             res.status(201).json({
                 success: true,
-                message: "Successfully registered for event",
-                data: { registration },
+                message: event.is_paid
+                    ? "Registration created. Please complete payment to confirm your registration."
+                    : "Successfully registered for event",
+                data: {
+                    registration,
+                    requiresPayment: event.is_paid,
+                    amount: event.price || 0,
+                },
             });
         }
         catch (error) {
@@ -311,7 +328,7 @@ export class RegistrationController {
             const { data: registrations, error } = await supabase
                 .from("registrations")
                 .select(`
-          id, status, created_at, email, name, responses, qr_code,
+          id, status, payment_status, created_at, email, name, responses, qr_code,
           event:event_id(
             id, title, description, start_date, end_date, 
             location, banner_url, is_paid, price
@@ -444,9 +461,10 @@ export class RegistrationController {
             }
             const { data: registration, error } = await supabase
                 .from("registrations")
-                .select("id, status, created_at")
+                .select("id, status, payment_status, created_at")
                 .eq("event_id", eventId)
                 .eq("user_id", userId)
+                .neq("status", "cancelled")
                 .single();
             if (error && error.code !== "PGRST116") {
                 // PGRST116 is "not found"
@@ -490,7 +508,11 @@ export class RegistrationController {
                 .from("registrations")
                 .select(`
           id, name, email, qr_code, status, created_at, user_id,
-          event:event_id(id, title, start_date, end_date, location)
+          event:event_id(
+            id, title, start_date, end_date, location, 
+            description, capacity, banner_url, is_paid, price,
+            organizer:organizer_id(name, organization_name)
+          )
         `)
                 .eq("id", registrationId)
                 .single();

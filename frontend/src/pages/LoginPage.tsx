@@ -67,7 +67,7 @@ const LoginPage = () => {
               <input
                 {...register("email")}
                 type="email"
-                className="input-field"
+                className="input"
                 placeholder="Enter your email"
               />
               {errors.email && (
@@ -86,7 +86,7 @@ const LoginPage = () => {
               <input
                 {...register("password")}
                 type="password"
-                className="input-field"
+                className="input"
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -127,7 +127,7 @@ const LoginPage = () => {
             <button
               type="submit"
               disabled={isSubmitting || isLoading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting || isLoading ? "Signing in..." : "Sign in"}
             </button>

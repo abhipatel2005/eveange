@@ -114,16 +114,13 @@ const CreateEventPage: React.FC = () => {
 
       <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
         {/* Basic Information */}
-        <div className="space-y-4">
+        <div className="form-section">
           <h2 className="text-xl font-semibold text-gray-900">
             Basic Information
           </h2>
 
           <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="title" className="form-label">
               Event Title *
             </label>
             <input
@@ -134,17 +131,12 @@ const CreateEventPage: React.FC = () => {
               placeholder="Enter event title"
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.title.message}
-              </p>
+              <p className="form-error">{errors.title.message}</p>
             )}
           </div>
 
           <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="description" className="form-label">
               Description *
             </label>
             <textarea
@@ -155,17 +147,12 @@ const CreateEventPage: React.FC = () => {
               placeholder="Describe your event"
             />
             {errors.description && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.description.message}
-              </p>
+              <p className="form-error">{errors.description.message}</p>
             )}
           </div>
 
           <div>
-            <label
-              htmlFor="location"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="location" className="form-label">
               Location *
             </label>
             <input
@@ -176,17 +163,12 @@ const CreateEventPage: React.FC = () => {
               placeholder="Event location or venue"
             />
             {errors.location && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.location.message}
-              </p>
+              <p className="form-error">{errors.location.message}</p>
             )}
           </div>
 
           <div>
-            <label
-              htmlFor="bannerUrl"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="bannerUrl" className="form-label">
               Banner Image URL
             </label>
             <input
@@ -197,9 +179,7 @@ const CreateEventPage: React.FC = () => {
               placeholder="https://example.com/banner.jpg"
             />
             {errors.bannerUrl && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.bannerUrl.message}
-              </p>
+              <p className="form-error">{errors.bannerUrl.message}</p>
             )}
           </div>
         </div>
@@ -343,7 +323,7 @@ const CreateEventPage: React.FC = () => {
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                    ₹
+                    $
                   </span>
                   <input
                     {...register("price", { valueAsNumber: true })}

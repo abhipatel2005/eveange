@@ -4,6 +4,12 @@ import type { ApiResponse } from "./client";
 export interface Registration {
   id: string;
   status: "pending" | "confirmed" | "cancelled" | "attended";
+  payment_status?:
+    | "not_required"
+    | "pending"
+    | "completed"
+    | "failed"
+    | "refunded";
   email: string;
   name: string;
   responses?: Record<string, any>; // Changed from form_data to responses
@@ -42,7 +48,13 @@ export const RegistrationService = {
   async registerForEvent(
     eventId: string,
     data: RegisterForEventData
-  ): Promise<ApiResponse<{ registration: Registration }>> {
+  ): Promise<
+    ApiResponse<{
+      registration: Registration;
+      requiresPayment?: boolean;
+      amount?: number;
+    }>
+  > {
     return apiClient.post(`/registrations/events/${eventId}/register`, data);
   },
 

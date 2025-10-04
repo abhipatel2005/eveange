@@ -125,7 +125,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   >
                     Sign in
                   </Link>
-                  <Link to="/register" className="btn-primary">
+                  <Link to="/register" className="btn btn-primary">
                     Get Started
                   </Link>
                 </div>

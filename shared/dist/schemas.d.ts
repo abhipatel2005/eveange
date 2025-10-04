@@ -415,7 +415,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: z.ZodRecord<z.ZodString, z.ZodAny>;
     status: z.ZodEnum<["pending", "confirmed", "cancelled", "attended"]>;
     qrCode: z.ZodString;
-    paymentStatus: z.ZodOptional<z.ZodEnum<["pending", "completed", "failed"]>>;
+    paymentStatus: z.ZodOptional<z.ZodEnum<["pending", "completed", "failed", "not_required"]>>;
     paymentId: z.ZodOptional<z.ZodString>;
     createdAt: z.ZodDate;
     updatedAt: z.ZodDate;
@@ -430,7 +430,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: Record<string, any>;
     qrCode: string;
     userId?: string | undefined;
-    paymentStatus?: "pending" | "completed" | "failed" | undefined;
+    paymentStatus?: "pending" | "completed" | "failed" | "not_required" | undefined;
     paymentId?: string | undefined;
 }, {
     id: string;
@@ -443,7 +443,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: Record<string, any>;
     qrCode: string;
     userId?: string | undefined;
-    paymentStatus?: "pending" | "completed" | "failed" | undefined;
+    paymentStatus?: "pending" | "completed" | "failed" | "not_required" | undefined;
     paymentId?: string | undefined;
 }>;
 export declare const CreateRegistrationSchema: z.ZodObject<{

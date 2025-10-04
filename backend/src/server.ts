@@ -17,6 +17,7 @@ import templateRoutes from "./routes/templates.js";
 import checkinRoutes from "./routes/checkin.js";
 import emailAuthRoutes from "./routes/emailAuth.js";
 import staffRoutes from "./routes/staff.js";
+import paymentRoutes from "./routes/payments.js";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -48,6 +49,10 @@ app.use(
   })
 );
 app.use(limiter);
+
+// Raw body parsing for Stripe webhooks (must be before express.json())
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(requestLogger);
@@ -75,6 +80,7 @@ app.use("/api/templates", templateRoutes);
 app.use("/api/checkin", checkinRoutes);
 app.use("/api/email", emailAuthRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {

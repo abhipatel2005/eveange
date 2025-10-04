@@ -92,7 +92,7 @@ const RegisterPage = () => {
                 {...register("name")}
                 type="text"
                 autoComplete="name"
-                className="input-field"
+                className="input"
                 placeholder="Enter your full name"
               />
               {errors.name && (
@@ -113,7 +113,7 @@ const RegisterPage = () => {
                 {...register("email")}
                 type="email"
                 autoComplete="email"
-                className="input-field"
+                className="input"
                 placeholder="Enter your email"
               />
               {errors.email && (
@@ -130,7 +130,7 @@ const RegisterPage = () => {
               >
                 Account Type
               </label>
-              <select {...register("role")} className="input-field">
+              <select {...register("role")} className="input">
                 <option value="participant">Participant</option>
                 <option value="organizer">Event Organizer</option>
               </select>
@@ -152,7 +152,7 @@ const RegisterPage = () => {
                 <input
                   {...register("organizationName")}
                   type="text"
-                  className="input-field"
+                  className="input"
                   placeholder="Enter your organization name"
                 />
                 {errors.organizationName && (
@@ -174,7 +174,7 @@ const RegisterPage = () => {
                 {...register("phoneNumber")}
                 type="tel"
                 autoComplete="tel"
-                className="input-field"
+                className="input"
                 placeholder="Enter your phone number"
               />
               {errors.phoneNumber && (
@@ -195,7 +195,7 @@ const RegisterPage = () => {
                 {...register("password")}
                 type="password"
                 autoComplete="new-password"
-                className="input-field"
+                className="input"
                 placeholder="Create a password (min. 8 characters)"
               />
               {errors.password && (
@@ -216,7 +216,7 @@ const RegisterPage = () => {
                 {...register("confirmPassword")}
                 type="password"
                 autoComplete="new-password"
-                className="input-field"
+                className="input"
                 placeholder="Confirm your password"
               />
               {errors.confirmPassword && (
@@ -231,7 +231,7 @@ const RegisterPage = () => {
             <button
               type="submit"
               disabled={isSubmitting || isLoading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting || isLoading
                 ? "Creating Account..."

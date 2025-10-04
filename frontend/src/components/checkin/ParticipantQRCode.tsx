@@ -8,6 +8,9 @@ interface ParticipantQRCodeProps {
   participantName: string;
   participantEmail: string;
   qrCode: string;
+  eventLocation?: string;
+  eventDate?: string;
+  eventTime?: string;
 }
 
 export function ParticipantQRCode({
@@ -15,19 +18,21 @@ export function ParticipantQRCode({
   participantName,
   participantEmail,
   qrCode,
+  eventLocation,
+  eventDate,
+  eventTime,
 }: ParticipantQRCodeProps) {
   const [eventDetails, setEventDetails] = useState<any>(null);
 
   useEffect(() => {
-    // In a real app, you'd fetch event details here
-    // For now, we'll use mock data
+    // Use real event data passed as props
     setEventDetails({
       title: eventTitle,
-      date: new Date().toLocaleDateString(),
-      location: "Event Venue",
-      time: "10:00 AM",
+      date: eventDate || new Date().toLocaleDateString(),
+      location: eventLocation || "Event Venue",
+      time: eventTime || "10:00 AM",
     });
-  }, [eventTitle]);
+  }, [eventTitle, eventLocation, eventDate, eventTime]);
 
   const downloadQRCode = () => {
     const svg = document.querySelector(

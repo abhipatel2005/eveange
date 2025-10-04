@@ -61,8 +61,14 @@ export const CreateEventSchema = z.object({
 export const UpdateEventSchema = z.object({
     title: z.string().min(1).optional(),
     description: z.string().optional(),
-    startDate: z.string().transform((val) => new Date(val)).optional(),
-    endDate: z.string().transform((val) => new Date(val)).optional(),
+    startDate: z
+        .string()
+        .transform((val) => new Date(val))
+        .optional(),
+    endDate: z
+        .string()
+        .transform((val) => new Date(val))
+        .optional(),
     location: z.string().min(1).optional(),
     capacity: z.number().positive().optional(),
     categoryId: z.string().uuid().optional(),
@@ -136,7 +142,7 @@ export const RegistrationSchema = z.object({
     responses: z.record(z.string(), z.any()),
     status: z.enum(["pending", "confirmed", "cancelled", "attended"]),
     qrCode: z.string(),
-    paymentStatus: z.enum(["pending", "completed", "failed"]).optional(),
+    paymentStatus: z.enum(["pending", "completed", "failed", "not_required"]).optional(),
     paymentId: z.string().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),

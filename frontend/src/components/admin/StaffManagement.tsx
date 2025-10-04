@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { UserPlus, Mail, Trash2, Shield, Eye } from "lucide-react";
+import {
+  UserPlus,
+  Mail,
+  Trash2,
+  Shield,
+  Eye,
+  MoreHorizontal,
+} from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 interface Staff {
@@ -33,6 +40,7 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [hasGmailPermission, setHasGmailPermission] = useState(false);
   const [checkingGmailPermission, setCheckingGmailPermission] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState({
     email: "",
     name: "",
@@ -46,6 +54,18 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
     fetchStaff();
     checkGmailPermission();
   }, [eventId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown && !(event.target as Element).closest(".relative")) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDropdown]);
 
   const fetchStaff = async () => {
     try {
@@ -508,7 +528,8 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-4">
+                  {/* Desktop Layout - hidden on mobile */}
+                  <div className="hidden md:flex items-center space-x-4">
                     {/* Permissions */}
                     <div className="flex space-x-2">
                       {member.permissions.can_check_in && (
@@ -571,6 +592,97 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Mobile Layout - 3-dot menu */}
+                  <div className="md:hidden relative">
+                    <button
+                      onClick={() =>
+                        setOpenDropdown(
+                          openDropdown === member.id ? null : member.id
+                        )
+                      }
+                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {openDropdown === member.id && (
+                      <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                        <div className="p-3 space-y-3">
+                          {/* Permissions */}
+                          <div>
+                            <p className="text-xs font-medium text-gray-700 mb-2">
+                              Permissions:
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {member.permissions.can_check_in && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Check-in
+                                </span>
+                              )}
+                              {member.permissions.can_view_stats && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Stats
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Last Login */}
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">
+                              Last Login:
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {member.user?.last_login_at
+                                ? new Date(
+                                    member.user.last_login_at
+                                  ).toLocaleDateString()
+                                : "Never logged in"}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex space-x-2 pt-2 border-t border-gray-100">
+                            <button
+                              onClick={() => {
+                                const subject = encodeURIComponent(
+                                  `Event Staff Access - ${eventId}`
+                                );
+                                const body = encodeURIComponent(
+                                  `Hi ${
+                                    member.user?.name || "Staff Member"
+                                  },\n\nYou have been granted staff access for this event. Please check your email for login credentials.\n\nBest regards`
+                                );
+                                window.open(
+                                  `mailto:${
+                                    member.user?.email || ""
+                                  }?subject=${subject}&body=${body}`
+                                );
+                                setOpenDropdown(null);
+                              }}
+                              className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
+                            >
+                              <Mail className="h-4 w-4" />
+                              <span>Email</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                removeStaff(member.user?.id || member.id);
+                                setOpenDropdown(null);
+                              }}
+                              className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

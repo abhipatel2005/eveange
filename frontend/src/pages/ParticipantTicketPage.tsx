@@ -10,11 +10,14 @@ interface Registration {
   email: string;
   qr_code: string;
   status: string;
+  payment_status?: string;
   event: {
     id: string;
     title: string;
     start_date: string;
     location: string;
+    is_paid?: boolean;
+    price?: number;
   };
 }
 
@@ -169,6 +172,17 @@ export function ParticipantTicketPage() {
           participantName={registration.name}
           participantEmail={registration.email}
           qrCode={registration.qr_code}
+          eventLocation={registration.event.location}
+          eventDate={new Date(
+            registration.event.start_date
+          ).toLocaleDateString()}
+          eventTime={new Date(registration.event.start_date).toLocaleTimeString(
+            [],
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+            }
+          )}
         />
 
         {/* Important Notes */}

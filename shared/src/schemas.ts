@@ -153,7 +153,9 @@ export const RegistrationSchema = z.object({
   responses: z.record(z.string(), z.any()),
   status: z.enum(["pending", "confirmed", "cancelled", "attended"]),
   qrCode: z.string(),
-  paymentStatus: z.enum(["pending", "completed", "failed"]).optional(),
+  paymentStatus: z
+    .enum(["pending", "completed", "failed", "not_required"])
+    .optional(),
   paymentId: z.string().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),

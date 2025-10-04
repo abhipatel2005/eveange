@@ -99,7 +99,7 @@ const createPowerPointCertificate = async (templatePath, placeholderMapping, cer
                 h: 0.5,
                 fontSize: 24,
                 bold: true,
-                align: "center"
+                align: "center",
             });
         });
         // Convert to buffer
@@ -124,7 +124,7 @@ const generateCertificateData = (participant, event, certificateCode) => {
         certificate_code: certificateCode,
         issue_date: new Date().toLocaleDateString(),
         organizer_name: event.organizer_name || "Event Organizer",
-        certificate_title: "Certificate of Participation"
+        certificate_title: "Certificate of Participation",
     };
 };
 // GET /api/certificates/event/:eventId - Get all certificates for an event

@@ -130,13 +130,14 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
             }
         }
         // Create staff assignment
+        // Permissions are already in array format from frontend
         const { data: assignment, error: assignmentError } = await supabase
             .from("staff_assignments")
             .insert({
             staff_id: staffUser.id,
             event_id: eventId,
             assigned_by: userId,
-            permissions,
+            permissions: permissions,
         })
             .select("*")
             .single();
@@ -163,6 +164,96 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
         });
     }
 });
+// Get staff members for an event
+router.get("/events/:eventId/staff", authenticateToken, async (req, res) => {
+    try {
+        const eventId = req.params.eventId;
+        const userId = req.user.id;
+        console.log("👥 Fetching staff for event:", eventId, "user:", userId);
+        console.log("👤 User object:", req.user);
+        // Check if user is the event organizer or admin
+        const { data: event, error: eventError } = await supabase
+            .from("events")
+            .select("id, organizer_id")
+            .eq("id", eventId)
+            .single();
+        console.log("🎪 Event lookup result:", { event, eventError });
+        if (eventError || !event) {
+            console.log("❌ Event not found");
+            return res.status(404).json({ error: "Event not found" });
+        }
+        // Only organizer or admin can view staff list
+        const { data: user, error: userError } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", userId)
+            .single();
+        console.log("👤 User role lookup:", { user, userError });
+        const isOrganizer = event.organizer_id === userId;
+        const isAdmin = user?.role === "admin";
+        console.log("🔐 Authorization check:", {
+            isOrganizer,
+            isAdmin,
+            eventOrganizerId: event.organizer_id,
+            userId,
+        });
+        if (!isOrganizer && !isAdmin) {
+            console.log("❌ Access denied - not organizer or admin");
+            return res.status(403).json({
+                error: "Access denied. Only event organizers and admins can view staff.",
+            });
+        }
+        // Fetch staff assignments with user details
+        const { data: staffAssignments, error: staffError } = await supabase
+            .from("staff_assignments")
+            .select(`
+          id,
+          permissions,
+          created_at,
+          assigned_by,
+          staff:users!staff_assignments_staff_id_fkey (
+            id,
+            name,
+            email,
+            last_login_at
+          ),
+          assigned_by:users!staff_assignments_assigned_by_fkey (
+            name,
+            email
+          )
+        `)
+            .eq("event_id", eventId)
+            .order("created_at", { ascending: false });
+        if (staffError) {
+            console.error("Error fetching staff:", staffError);
+            return res.status(500).json({ error: "Failed to fetch staff" });
+        }
+        // Transform the data to match the frontend interface
+        const staff = (staffAssignments || []).map((assignment) => ({
+            id: assignment.id,
+            permissions: {
+                can_check_in: Array.isArray(assignment.permissions)
+                    ? assignment.permissions.includes("check-in")
+                    : assignment.permissions?.can_check_in || false,
+                can_view_stats: Array.isArray(assignment.permissions)
+                    ? assignment.permissions.includes("view-stats")
+                    : assignment.permissions?.can_view_stats || false,
+            },
+            assigned_at: assignment.created_at, // Map created_at to assigned_at for frontend
+            user: assignment.staff,
+            assigned_by_user: assignment.assigned_by,
+        }));
+        console.log("✅ Staff fetched successfully:", staff.length, "members");
+        res.json({ success: true, staff });
+    }
+    catch (error) {
+        console.error("❌ Get staff error:", error);
+        res.status(500).json({
+            error: "Internal server error",
+            details: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+});
 // Get check-in stats for an event
 router.get("/events/:eventId/check-in-stats", authenticateToken, async (req, res) => {
     try {
@@ -174,7 +265,6 @@ router.get("/events/:eventId/check-in-stats", authenticateToken, async (req, res
             .from("events")
             .select("id, organizer_id")
             .eq("id", eventId)
-            .eq("is_active", true)
             .single();
         if (eventError || !eventAccess) {
             return res.status(404).json({ error: "Event not found" });

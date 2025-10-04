@@ -21,6 +21,7 @@ import ParticipantTicketPage from "./pages/ParticipantTicketPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import EventsPage from "./pages/EventsPage";
 import QRScannerPage from "./pages/QRScannerPage";
+import PaymentPage from "./pages/PaymentPage";
 
 function App() {
   const validateToken = useAuthStore((state) => state.validateToken);
@@ -150,6 +151,16 @@ function App() {
 
         {/* Public registration form */}
         <Route path="/events/:id/register" element={<RegistrationFormPage />} />
+
+        {/* Payment page */}
+        <Route
+          path="/events/:id/payment"
+          element={
+            <ProtectedRoute>
+              <PaymentPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Layout>
   );

@@ -113,10 +113,22 @@ const RegistrationFormPage: React.FC = () => {
         },
       });
 
-      if (response.success) {
-        navigate(`/events/${id}`, {
-          state: { message: "Successfully registered for the event!" },
-        });
+      if (response.success && response.data) {
+        // Check if payment is required
+        if (response.data.requiresPayment) {
+          // Navigate to payment page with registration data
+          navigate(`/events/${id}/payment`, {
+            state: {
+              registration: response.data.registration,
+              amount: response.data.amount,
+              message: response.message,
+            },
+          });
+        } else {
+          navigate(`/events/${id}`, {
+            state: { message: "Successfully registered for the event!" },
+          });
+        }
       } else {
         setError(response.error || "Failed to register for event");
       }
@@ -565,7 +577,7 @@ const RegistrationFormPage: React.FC = () => {
                 Registering...
               </div>
             ) : event.is_paid ? (
-              `Register & Pay ₹${event.price}`
+              `Register & Pay $${event.price}`
             ) : (
               "Register for Event"
             )}

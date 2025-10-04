@@ -76,19 +76,48 @@ const EventsPage: React.FC = () => {
   };
 
   const isUserRegistered = (eventId: string) => {
-    return userRegistrations.some(
+    const registration = userRegistrations.find(
       (registration) =>
         registration.event?.id === eventId &&
         registration.status !== "cancelled"
+    );
+
+    if (!registration) return false;
+
+    // For paid events, payment must be completed
+    if (registration.event?.is_paid) {
+      return registration.payment_status === "completed";
+    }
+
+    // For free events, registration should be confirmed or payment not required
+    return (
+      registration.status === "confirmed" ||
+      registration.payment_status === "not_required"
     );
   };
 
   const getUserRegistrationForEvent = (eventId: string) => {
-    return userRegistrations.find(
+    const registration = userRegistrations.find(
       (registration) =>
         registration.event?.id === eventId &&
         registration.status !== "cancelled"
     );
+
+    if (!registration) return undefined;
+
+    // For paid events, payment must be completed
+    if (registration.event?.is_paid) {
+      return registration.payment_status === "completed"
+        ? registration
+        : undefined;
+    }
+
+    // For free events, registration should be confirmed or payment not required
+    const isValidFreeRegistration =
+      registration.status === "confirmed" ||
+      registration.payment_status === "not_required";
+
+    return isValidFreeRegistration ? registration : undefined;
   };
 
   const getEventStatus = (event: Event) => {
@@ -266,7 +295,7 @@ const EventsPage: React.FC = () => {
 
                         {event.is_paid && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            ₹{event.price}
+                            ${event.price}
                           </span>
                         )}
                       </div>

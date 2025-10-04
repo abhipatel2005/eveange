@@ -21,31 +21,33 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         // Generate unique filename: eventId_timestamp_originalname
-        const eventId = req.body.eventId || 'template';
+        const eventId = req.body.eventId || "template";
         const timestamp = Date.now();
         const ext = path.extname(file.originalname);
         cb(null, `${eventId}_${timestamp}${ext}`);
-    }
+    },
 });
 const fileFilter = (req, file, cb) => {
     // Only allow PowerPoint files
     const allowedMimes = [
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/vnd.ms-powerpoint'
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.ms-powerpoint",
     ];
-    if (allowedMimes.includes(file.mimetype) || file.originalname.endsWith('.pptx') || file.originalname.endsWith('.ppt')) {
+    if (allowedMimes.includes(file.mimetype) ||
+        file.originalname.endsWith(".pptx") ||
+        file.originalname.endsWith(".ppt")) {
         cb(null, true);
     }
     else {
-        cb(new Error('Only PowerPoint files (.ppt, .pptx) are allowed'), false);
+        cb(new Error("Only PowerPoint files (.ppt, .pptx) are allowed"), false);
     }
 };
 const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    }
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
 });
 // Default certificate template configuration
 export const DEFAULT_TEMPLATE = {
@@ -66,28 +68,103 @@ export const DEFAULT_TEMPLATE = {
             name: "bold 36px Arial",
         },
         layout: {
-            title: { x: 600, y: 150, align: "center", placeholder: "{{certificate_title}}" },
-            subtitle: { x: 600, y: 220, align: "center", placeholder: "{{subtitle}}" },
-            participantName: { x: 600, y: 300, align: "center", placeholder: "{{participant_name}}" },
-            eventText: { x: 600, y: 360, align: "center", placeholder: "{{event_description}}" },
-            eventName: { x: 600, y: 420, align: "center", placeholder: "{{event_title}}" },
-            eventDate: { x: 600, y: 480, align: "center", placeholder: "{{event_date}}" },
-            certificateCode: { x: 600, y: 700, align: "center", placeholder: "{{certificate_code}}" },
-        }
-    }
+            title: {
+                x: 600,
+                y: 150,
+                align: "center",
+                placeholder: "{{certificate_title}}",
+            },
+            subtitle: {
+                x: 600,
+                y: 220,
+                align: "center",
+                placeholder: "{{subtitle}}",
+            },
+            participantName: {
+                x: 600,
+                y: 300,
+                align: "center",
+                placeholder: "{{participant_name}}",
+            },
+            eventText: {
+                x: 600,
+                y: 360,
+                align: "center",
+                placeholder: "{{event_description}}",
+            },
+            eventName: {
+                x: 600,
+                y: 420,
+                align: "center",
+                placeholder: "{{event_title}}",
+            },
+            eventDate: {
+                x: 600,
+                y: 480,
+                align: "center",
+                placeholder: "{{event_date}}",
+            },
+            certificateCode: {
+                x: 600,
+                y: 700,
+                align: "center",
+                placeholder: "{{certificate_code}}",
+            },
+        },
+    },
 };
 // Available data fields for placeholder mapping
 export const AVAILABLE_DATA_FIELDS = [
-    { key: "participant_name", label: "Participant Name", description: "Name of the certificate recipient" },
-    { key: "participant_email", label: "Participant Email", description: "Email address of the participant" },
-    { key: "event_title", label: "Event Title", description: "Name of the event" },
-    { key: "event_description", label: "Event Description", description: "Description of the event" },
-    { key: "event_date", label: "Event Date", description: "Date when the event took place" },
-    { key: "event_location", label: "Event Location", description: "Location where the event was held" },
-    { key: "certificate_code", label: "Certificate Code", description: "Unique verification code for the certificate" },
-    { key: "issue_date", label: "Issue Date", description: "Date when the certificate was issued" },
-    { key: "organizer_name", label: "Organizer Name", description: "Name of the event organizer" },
-    { key: "certificate_title", label: "Certificate Title", description: "Title of the certificate (e.g., 'Certificate of Completion')" },
+    {
+        key: "participant_name",
+        label: "Participant Name",
+        description: "Name of the certificate recipient",
+    },
+    {
+        key: "participant_email",
+        label: "Participant Email",
+        description: "Email address of the participant",
+    },
+    {
+        key: "event_title",
+        label: "Event Title",
+        description: "Name of the event",
+    },
+    {
+        key: "event_description",
+        label: "Event Description",
+        description: "Description of the event",
+    },
+    {
+        key: "event_date",
+        label: "Event Date",
+        description: "Date when the event took place",
+    },
+    {
+        key: "event_location",
+        label: "Event Location",
+        description: "Location where the event was held",
+    },
+    {
+        key: "certificate_code",
+        label: "Certificate Code",
+        description: "Unique verification code for the certificate",
+    },
+    {
+        key: "issue_date",
+        label: "Issue Date",
+        description: "Date when the certificate was issued",
+    },
+    {
+        key: "organizer_name",
+        label: "Organizer Name",
+        description: "Name of the event organizer",
+    },
+    {
+        key: "certificate_title",
+        label: "Certificate Title",
+        description: "Title of the certificate (e.g., 'Certificate of Completion')",
+    },
 ];
 // Function to extract placeholders from PowerPoint file
 const extractPlaceholdersFromPPTX = async (filePath) => {
@@ -96,7 +173,7 @@ const extractPlaceholdersFromPPTX = async (filePath) => {
         // For now, we'll use a regex to find placeholders in the file
         // In a more advanced implementation, we could parse the PPTX XML
         const fileBuffer = await fs.readFile(filePath);
-        const fileContent = fileBuffer.toString('binary');
+        const fileContent = fileBuffer.toString("binary");
         // Find all {{placeholder}} patterns
         const placeholderRegex = /\{\{([^}]+)\}\}/g;
         const placeholders = new Set();
@@ -116,7 +193,7 @@ router.get("/data-fields", authenticateToken, async (req, res) => {
     try {
         res.json({
             success: true,
-            data: AVAILABLE_DATA_FIELDS
+            data: AVAILABLE_DATA_FIELDS,
         });
     }
     catch (error) {
@@ -140,7 +217,7 @@ router.get("/event/:eventId", authenticateToken, async (req, res) => {
         }
         if (event.organizer_id !== userId) {
             return res.status(403).json({
-                error: "Access denied. Only event organizers can view templates."
+                error: "Access denied. Only event organizers can view templates.",
             });
         }
         // Get custom templates for this event
@@ -159,8 +236,8 @@ router.get("/event/:eventId", authenticateToken, async (req, res) => {
             data: {
                 templates: allTemplates,
                 default_template_id: "default",
-                available_fields: AVAILABLE_DATA_FIELDS
-            }
+                available_fields: AVAILABLE_DATA_FIELDS,
+            },
         });
     }
     catch (error) {
@@ -169,14 +246,14 @@ router.get("/event/:eventId", authenticateToken, async (req, res) => {
     }
 });
 // POST /api/templates/upload - Upload PowerPoint template
-router.post("/upload", authenticateToken, upload.single('template'), async (req, res) => {
+router.post("/upload", authenticateToken, upload.single("template"), async (req, res) => {
     try {
         const { eventId, templateName, placeholderMapping } = req.body;
         const userId = req.user.id;
         const uploadedFile = req.file;
         if (!eventId || !templateName || !uploadedFile) {
             return res.status(400).json({
-                error: "Event ID, template name, and PowerPoint file are required"
+                error: "Event ID, template name, and PowerPoint file are required",
             });
         }
         // Check if user is organizer of the event
@@ -190,7 +267,7 @@ router.post("/upload", authenticateToken, upload.single('template'), async (req,
         }
         if (event.organizer_id !== userId) {
             return res.status(403).json({
-                error: "Access denied. Only event organizers can upload templates."
+                error: "Access denied. Only event organizers can upload templates.",
             });
         }
         // Extract placeholders from the uploaded PowerPoint file
@@ -199,9 +276,10 @@ router.post("/upload", authenticateToken, upload.single('template'), async (req,
         let mapping = {};
         if (placeholderMapping) {
             try {
-                mapping = typeof placeholderMapping === 'string'
-                    ? JSON.parse(placeholderMapping)
-                    : placeholderMapping;
+                mapping =
+                    typeof placeholderMapping === "string"
+                        ? JSON.parse(placeholderMapping)
+                        : placeholderMapping;
             }
             catch (err) {
                 console.warn("Invalid placeholder mapping format, using empty mapping");
@@ -214,14 +292,14 @@ router.post("/upload", authenticateToken, upload.single('template'), async (req,
             file_name: uploadedFile.originalname,
             placeholders: extractedPlaceholders,
             placeholder_mapping: mapping,
-            available_fields: AVAILABLE_DATA_FIELDS
+            available_fields: AVAILABLE_DATA_FIELDS,
         };
         const { data: newTemplate, error: createError } = await supabase
             .from("certificate_templates")
             .insert({
             event_id: eventId,
             name: templateName,
-            template: templateConfig
+            template: templateConfig,
         })
             .select("*")
             .single();
@@ -240,8 +318,9 @@ router.post("/upload", authenticateToken, upload.single('template'), async (req,
             data: {
                 template: newTemplate,
                 extracted_placeholders: extractedPlaceholders,
-                needs_mapping: extractedPlaceholders.length > 0 && Object.keys(mapping).length === 0
-            }
+                needs_mapping: extractedPlaceholders.length > 0 &&
+                    Object.keys(mapping).length === 0,
+            },
         });
     }
     catch (error) {
@@ -265,7 +344,9 @@ router.put("/:templateId/mapping", authenticateToken, async (req, res) => {
         const { placeholderMapping } = req.body;
         const userId = req.user.id;
         if (!placeholderMapping) {
-            return res.status(400).json({ error: "Placeholder mapping is required" });
+            return res
+                .status(400)
+                .json({ error: "Placeholder mapping is required" });
         }
         // Check if template exists and user has permission
         const { data: existingTemplate, error: templateError } = await supabase
@@ -286,13 +367,13 @@ router.put("/:templateId/mapping", authenticateToken, async (req, res) => {
             : existingTemplate.events;
         if (eventData.organizer_id !== userId) {
             return res.status(403).json({
-                error: "Access denied. Only event organizers can update templates."
+                error: "Access denied. Only event organizers can update templates.",
             });
         }
         // Update template configuration with new mapping
         const updatedConfig = {
             ...existingTemplate.template,
-            placeholder_mapping: placeholderMapping
+            placeholder_mapping: placeholderMapping,
         };
         const { data: updatedTemplate, error: updateError } = await supabase
             .from("certificate_templates")
@@ -301,11 +382,13 @@ router.put("/:templateId/mapping", authenticateToken, async (req, res) => {
             .select("*")
             .single();
         if (updateError) {
-            return res.status(500).json({ error: "Failed to update template mapping" });
+            return res
+                .status(500)
+                .json({ error: "Failed to update template mapping" });
         }
         res.json({
             success: true,
-            data: updatedTemplate
+            data: updatedTemplate,
         });
     }
     catch (error) {
@@ -337,7 +420,7 @@ router.delete("/:templateId", authenticateToken, async (req, res) => {
             : existingTemplate.events;
         if (eventData.organizer_id !== userId) {
             return res.status(403).json({
-                error: "Access denied. Only event organizers can delete templates."
+                error: "Access denied. Only event organizers can delete templates.",
             });
         }
         // Check if template is being used by any certificates
@@ -347,11 +430,13 @@ router.delete("/:templateId", authenticateToken, async (req, res) => {
             .eq("template_id", templateId)
             .limit(1);
         if (usageError) {
-            return res.status(500).json({ error: "Failed to check template usage" });
+            return res
+                .status(500)
+                .json({ error: "Failed to check template usage" });
         }
         if (usedCertificates && usedCertificates.length > 0) {
             return res.status(400).json({
-                error: "Cannot delete template that is being used by certificates"
+                error: "Cannot delete template that is being used by certificates",
             });
         }
         // Delete associated file if it exists
@@ -373,7 +458,7 @@ router.delete("/:templateId", authenticateToken, async (req, res) => {
         }
         res.json({
             success: true,
-            message: "Template deleted successfully"
+            message: "Template deleted successfully",
         });
     }
     catch (error) {

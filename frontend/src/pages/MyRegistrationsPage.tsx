@@ -7,6 +7,8 @@ import {
   Trash2,
   ExternalLink,
   AlertTriangle,
+  Ticket,
+  CreditCard,
 } from "lucide-react";
 import { RegistrationService } from "../api/registrations";
 import { formatDate } from "../utils/dateUtils.ts";
@@ -77,13 +79,43 @@ const MyRegistrationsPage: React.FC = () => {
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-800";
-      case "waitlisted":
+      case "pending":
         return "bg-yellow-100 text-yellow-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const getPaymentStatusColor = (paymentStatus?: string) => {
+    switch (paymentStatus) {
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "not_required":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const canAccessTicket = (registration: Registration): boolean => {
+    if (registration.status === "cancelled") return false;
+
+    // For paid events, payment must be completed
+    if (registration.event?.is_paid) {
+      return registration.payment_status === "completed";
+    }
+
+    // For free events, registration should be confirmed or payment not required
+    return (
+      registration.status === "confirmed" ||
+      registration.payment_status === "not_required"
+    );
   };
 
   if (isLoading) {
@@ -176,9 +208,19 @@ const MyRegistrationsPage: React.FC = () => {
                           >
                             {registration.status}
                           </span>
-                          {event.is_paid && (
+                          {event.is_paid && registration.payment_status && (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(
+                                registration.payment_status
+                              )}`}
+                            >
+                              <CreditCard className="w-3 h-3 mr-1" />
+                              {registration.payment_status.replace("_", " ")}
+                            </span>
+                          )}
+                          {!event.is_paid && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Paid Event
+                              Free Event
                             </span>
                           )}
                         </div>
@@ -208,13 +250,40 @@ const MyRegistrationsPage: React.FC = () => {
                       {/* Price info for paid events */}
                       {event.is_paid && event.price && (
                         <div className="mt-3 text-sm text-gray-600">
-                          Event Price: ₹{event.price}
+                          Event Price: ${event.price}
                         </div>
                       )}
                     </div>
 
                     {/* Actions */}
                     <div className="ml-6 flex flex-col space-y-2">
+                      {canAccessTicket(registration) && (
+                        <Link
+                          to={`/ticket/${registration.id}`}
+                          className="inline-flex items-center px-3 py-2 border border-green-300 shadow-sm text-sm leading-4 font-medium rounded-md text-green-700 bg-white hover:bg-green-50"
+                        >
+                          <Ticket className="h-4 w-4 mr-2" />
+                          View Ticket
+                        </Link>
+                      )}
+
+                      {event.is_paid &&
+                        registration.payment_status === "pending" && (
+                          <Link
+                            to={`/events/${event.id}/payment`}
+                            state={{
+                              registration: registration,
+                              amount: event.price || 0,
+                              message:
+                                "Complete your payment to confirm registration",
+                            }}
+                            className="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50"
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Complete Payment
+                          </Link>
+                        )}
+
                       <Link
                         to={`/events/${event.id}`}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -223,17 +292,18 @@ const MyRegistrationsPage: React.FC = () => {
                         View Event
                       </Link>
 
-                      {registration.status !== "cancelled" && (
-                        <button
-                          onClick={() =>
-                            handleCancelRegistration(registration.id)
-                          }
-                          className="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Cancel
-                        </button>
-                      )}
+                      {registration.status !== "cancelled" &&
+                        !canAccessTicket(registration) && (
+                          <button
+                            onClick={() =>
+                              handleCancelRegistration(registration.id)
+                            }
+                            className="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Cancel
+                          </button>
+                        )}
                     </div>
                   </div>
                 </div>
