@@ -77,9 +77,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <Link to="/" className="text-2xl font-bold text-primary-600">
-                  EventPro
-                </Link>
+                <p className="text-2xl font-bold text-primary-600">eventbase</p>
               </div>
 
               {/* Desktop Navigation */}
@@ -131,6 +129,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
+                  {/* Create Event Button */}
+                  <Link
+                    to="/events/create"
+                    className="btn btn-primary text-sm px-4 py-2"
+                  >
+                    Create Event
+                  </Link>
+
                   <div className="flex items-center space-x-2 text-sm text-gray-700">
                     <User className="w-4 h-4" />
                     <span>{user?.name}</span>
@@ -220,6 +226,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             ) : (
               <div className="pt-4 pb-3 border-t border-gray-200">
+                {/* Create Event Button for Mobile */}
+                <div className="px-4 mb-3">
+                  <Link
+                    to="/events/create"
+                    className="block btn btn-primary w-full text-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Create Event
+                  </Link>
+                </div>
+
                 <div className="flex items-center px-4 space-x-3">
                   <button className="p-2 rounded-full hover:bg-gray-100">
                     <User className="w-5 h-5" />
@@ -242,7 +259,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-500">
             <p>
-              &copy; {new Date().getFullYear()} EventPro. All rights reserved.
+              &copy; {new Date().getFullYear()} eventbase. All rights reserved.
             </p>
           </div>
         </div>

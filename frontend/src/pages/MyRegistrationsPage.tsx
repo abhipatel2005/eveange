@@ -96,7 +96,7 @@ const MyRegistrationsPage: React.FC = () => {
         return "bg-yellow-100 text-yellow-800";
       case "failed":
         return "bg-red-100 text-red-800";
-      case "not_required":
+      case null:
         return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -114,7 +114,7 @@ const MyRegistrationsPage: React.FC = () => {
     // For free events, registration should be confirmed or payment not required
     return (
       registration.status === "confirmed" ||
-      registration.payment_status === "not_required"
+      registration.payment_status === null
     );
   };
 

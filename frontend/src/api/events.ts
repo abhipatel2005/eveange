@@ -8,6 +8,8 @@ export interface Event {
   start_date: string;
   end_date: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   capacity: number;
   banner_url?: string;
   visibility: "public" | "private" | "invite-only";
@@ -28,7 +30,7 @@ export interface Event {
     name: string;
     color: string;
   };
-  registrations?: any[];
+  registrations?: any[] | { count: number }[];
 }
 
 export interface CreateEventData {
@@ -37,6 +39,8 @@ export interface CreateEventData {
   startDate: string;
   endDate: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   capacity: number;
   categoryId?: string;
   bannerUrl?: string;
@@ -52,6 +56,8 @@ export interface UpdateEventData {
   startDate?: string;
   endDate?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   capacity?: number;
   categoryId?: string;
   bannerUrl?: string;

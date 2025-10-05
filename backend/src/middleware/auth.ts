@@ -35,6 +35,16 @@ export const authenticateToken = async (
     // Clean token (remove any extra whitespace or characters)
     const cleanToken = token.trim();
 
+    // Basic JWT format validation
+    if (!cleanToken.includes(".") || cleanToken.split(".").length !== 3) {
+      console.log("Invalid JWT format:", cleanToken.substring(0, 20) + "...");
+      res.status(401).json({
+        success: false,
+        error: "Invalid token format",
+      });
+      return;
+    }
+
     // Verify JWT token
     const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET!) as any;
 

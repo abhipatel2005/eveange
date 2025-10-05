@@ -1,28 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { EventService, Event } from "../api/events";
 import { RegistrationService } from "../api/registrations";
+import {
+  RegistrationFormService,
+  RegistrationForm,
+} from "../api/registrationForms";
 import { useAuthStore } from "../store/authStore";
 import { handleError, ErrorPatterns } from "../utils/errorHandling";
-
-// Define the form schema
-const RegistrationFormSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().min(1, "Phone number is required"),
-  organization: z.string().optional(),
-  dietary: z.string().optional(),
-  accessibility: z.string().optional(),
-  comments: z.string().optional(),
-  emergencyContact: z.string().optional(),
-  emergencyPhone: z.string().optional(),
-});
-
-type RegistrationFormData = z.infer<typeof RegistrationFormSchema>;
+import { RegistrationFormRenderer } from "../components/forms/RegistrationFormRenderer";
 
 const RegistrationFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,19 +16,13 @@ const RegistrationFormPage: React.FC = () => {
   const { user } = useAuthStore();
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [registrationForm, setRegistrationForm] =
+    useState<RegistrationForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-  } = useForm<RegistrationFormData>({
-    resolver: zodResolver(RegistrationFormSchema),
-  });
+  const [formData, setFormData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,11 +45,26 @@ const RegistrationFormPage: React.FC = () => {
 
         setEvent(eventResponse.data.event);
 
+        // Fetch custom registration form
+        try {
+          const formResponse =
+            await RegistrationFormService.getRegistrationForm(id);
+          if (formResponse.success && formResponse.data) {
+            setRegistrationForm(formResponse.data.form);
+          }
+        } catch (formError) {
+          console.log("No custom form found, will use default form");
+          // Don't set error here - we'll fall back to default form
+        }
+
         // Pre-fill form with user data if available
         if (user) {
-          setValue("email", user.email);
-          setValue("firstName", user.name.split(" ")[0] || "");
-          setValue("lastName", user.name.split(" ").slice(1).join(" ") || "");
+          setFormData((prev) => ({
+            ...prev,
+            email: user.email,
+            firstName: user.name.split(" ")[0] || "",
+            lastName: user.name.split(" ").slice(1).join(" ") || "",
+          }));
         }
 
         // Check if user is already registered
@@ -89,9 +84,14 @@ const RegistrationFormPage: React.FC = () => {
     };
 
     fetchData();
-  }, [id, user, setValue]);
+  }, [id, user]);
 
-  const onSubmit = async (data: RegistrationFormData) => {
+  const handleInputChange = (fieldId: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!event || !id || !user) return;
 
     try {
@@ -99,18 +99,7 @@ const RegistrationFormPage: React.FC = () => {
       setError(null);
 
       const response = await RegistrationService.registerForEvent(id, {
-        formData: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          organization: data.organization,
-          dietary: data.dietary,
-          accessibility: data.accessibility,
-          comments: data.comments,
-          emergencyContact: data.emergencyContact,
-          emergencyPhone: data.emergencyPhone,
-        },
+        formData: formData,
       });
 
       if (response.success && response.data) {
@@ -357,233 +346,280 @@ const RegistrationFormPage: React.FC = () => {
       )}
 
       {/* Registration Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Personal Information
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="firstName"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                First Name *
-              </label>
-              <input
-                {...register("firstName")}
-                type="text"
-                id="firstName"
-                className={`input ${errors.firstName ? "border-red-500" : ""}`}
-                placeholder="Enter your first name"
-              />
-              {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.firstName.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="lastName"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Last Name *
-              </label>
-              <input
-                {...register("lastName")}
-                type="text"
-                id="lastName"
-                className={`input ${errors.lastName ? "border-red-500" : ""}`}
-                placeholder="Enter your last name"
-              />
-              {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.lastName.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Email Address *
-            </label>
-            <input
-              {...register("email")}
-              type="email"
-              id="email"
-              className={`input ${errors.email ? "border-red-500" : ""}`}
-              placeholder="Enter your email address"
-            />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.email.message}
+      <form onSubmit={onSubmit} className="space-y-6">
+        {registrationForm ? (
+          // Render custom form
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              {registrationForm.title}
+            </h2>
+            {registrationForm.description && (
+              <p className="text-gray-600 mb-6">
+                {registrationForm.description}
               </p>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="phone"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Phone Number *
-              </label>
-              <input
-                {...register("phone")}
-                type="tel"
-                id="phone"
-                className={`input ${errors.phone ? "border-red-500" : ""}`}
-                placeholder="Enter your phone number"
-              />
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.phone.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="organization"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Organization
-              </label>
-              <input
-                {...register("organization")}
-                type="text"
-                id="organization"
-                className="input"
-                placeholder="Company or organization"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Additional Information
-          </h3>
-
-          <div>
-            <label
-              htmlFor="dietary"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Dietary Requirements
-            </label>
-            <input
-              {...register("dietary")}
-              type="text"
-              id="dietary"
-              className="input"
-              placeholder="Any dietary restrictions or preferences"
+            <RegistrationFormRenderer
+              form={registrationForm}
+              onDataChange={setFormData}
+              initialData={formData}
             />
           </div>
+        ) : (
+          // Fallback to default form if no custom form exists
+          <DefaultRegistrationFormFields
+            event={event}
+            formData={formData}
+            handleInputChange={handleInputChange}
+          />
+        )}
 
-          <div>
-            <label
-              htmlFor="accessibility"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Accessibility Needs
-            </label>
-            <input
-              {...register("accessibility")}
-              type="text"
-              id="accessibility"
-              className="input"
-              placeholder="Any accessibility requirements"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="emergencyContact"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Emergency Contact Name
-              </label>
-              <input
-                {...register("emergencyContact")}
-                type="text"
-                id="emergencyContact"
-                className="input"
-                placeholder="Emergency contact name"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="emergencyPhone"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Emergency Contact Phone
-              </label>
-              <input
-                {...register("emergencyPhone")}
-                type="tel"
-                id="emergencyPhone"
-                className="input"
-                placeholder="Emergency contact phone"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="comments"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Additional Comments
-            </label>
-            <textarea
-              {...register("comments")}
-              id="comments"
-              rows={3}
-              className="input"
-              placeholder="Any additional information or comments"
-            />
-          </div>
-        </div>
-
-        {/* Submit */}
-        <div className="flex justify-end space-x-4 pt-6 border-t">
-          <button
-            type="button"
-            onClick={() => navigate(`/events/${event.id}`)}
-            className="btn btn-secondary"
-            disabled={submitting}
-          >
-            Cancel
-          </button>
+        {/* Single Submit Button for both forms */}
+        <div className="flex justify-end">
           <button
             type="submit"
-            className="btn btn-primary"
             disabled={submitting}
+            className="px-6 py-3 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
                 Registering...
-              </div>
-            ) : event.is_paid ? (
-              `Register & Pay $${event.price}`
+              </>
             ) : (
-              "Register for Event"
+              <>Register for Event</>
             )}
           </button>
         </div>
       </form>
+    </div>
+  );
+};
+
+// Default registration form component (just the fields, no form wrapper)
+const DefaultRegistrationFormFields: React.FC<{
+  event: Event;
+  formData: Record<string, any>;
+  handleInputChange: (fieldId: string, value: any) => void;
+}> = ({ event, formData, handleInputChange }) => {
+  return (
+    <div className="card space-y-6">
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Personal Information
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="firstName"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              First Name *
+            </label>
+            <input
+              type="text"
+              id="firstName"
+              value={formData.firstName || ""}
+              onChange={(e) => handleInputChange("firstName", e.target.value)}
+              className="input"
+              placeholder="Enter your first name"
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="lastName"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Last Name *
+            </label>
+            <input
+              type="text"
+              id="lastName"
+              value={formData.lastName || ""}
+              onChange={(e) => handleInputChange("lastName", e.target.value)}
+              className="input"
+              placeholder="Enter your last name"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Email Address *
+          </label>
+          <input
+            type="email"
+            id="email"
+            value={formData.email || ""}
+            onChange={(e) => handleInputChange("email", e.target.value)}
+            className="input"
+            placeholder="Enter your email address"
+            required
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="phone"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Phone Number *
+          </label>
+          <input
+            type="tel"
+            id="phone"
+            value={formData.phone || ""}
+            onChange={(e) => handleInputChange("phone", e.target.value)}
+            className="input"
+            placeholder="Enter your phone number"
+            required
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="organization"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Organization (Optional)
+          </label>
+          <input
+            type="text"
+            id="organization"
+            value={formData.organization || ""}
+            onChange={(e) => handleInputChange("organization", e.target.value)}
+            className="input"
+            placeholder="Enter your organization"
+          />
+        </div>
+      </div>
+
+      {/* Additional Fields */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Additional Information
+        </h3>
+
+        <div>
+          <label
+            htmlFor="dietary"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Dietary Requirements (Optional)
+          </label>
+          <textarea
+            id="dietary"
+            rows={3}
+            value={formData.dietary || ""}
+            onChange={(e) => handleInputChange("dietary", e.target.value)}
+            className="input"
+            placeholder="Please list any dietary requirements or food allergies"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="accessibility"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Accessibility Requirements (Optional)
+          </label>
+          <textarea
+            id="accessibility"
+            rows={3}
+            value={formData.accessibility || ""}
+            onChange={(e) => handleInputChange("accessibility", e.target.value)}
+            className="input"
+            placeholder="Please describe any accessibility requirements"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="comments"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Additional Comments (Optional)
+          </label>
+          <textarea
+            id="comments"
+            rows={3}
+            value={formData.comments || ""}
+            onChange={(e) => handleInputChange("comments", e.target.value)}
+            className="input"
+            placeholder="Any additional comments or questions"
+          />
+        </div>
+      </div>
+
+      {/* Emergency Contact */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Emergency Contact (Optional)
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="emergencyContact"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Contact Name
+            </label>
+            <input
+              type="text"
+              id="emergencyContact"
+              value={formData.emergencyContact || ""}
+              onChange={(e) =>
+                handleInputChange("emergencyContact", e.target.value)
+              }
+              className="input"
+              placeholder="Emergency contact name"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="emergencyPhone"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Contact Phone
+            </label>
+            <input
+              type="tel"
+              id="emergencyPhone"
+              value={formData.emergencyPhone || ""}
+              onChange={(e) =>
+                handleInputChange("emergencyPhone", e.target.value)
+              }
+              className="input"
+              placeholder="Emergency contact phone"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Terms and Conditions */}
+      <div className="border-t pt-6">
+        <div className="bg-gray-50 rounded-lg p-4">
+          <p className="text-sm text-gray-700">
+            By registering for this event, you agree to provide accurate
+            information and comply with the event terms and conditions.
+            {event.is_paid && (
+              <span className="font-medium">
+                {" "}
+                Payment will be required to complete your registration.
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

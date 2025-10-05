@@ -31,13 +31,13 @@ export declare const CreateUserSchema: z.ZodObject<{
     email: z.ZodString;
     password: z.ZodString;
     name: z.ZodString;
-    role: z.ZodDefault<z.ZodEnum<["organizer", "participant"]>>;
+    role: z.ZodDefault<z.ZodEnum<["participant"]>>;
     organizationName: z.ZodOptional<z.ZodString>;
     phoneNumber: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     email: string;
     name: string;
-    role: "organizer" | "participant";
+    role: "participant";
     password: string;
     organizationName?: string | undefined;
     phoneNumber?: string | undefined;
@@ -45,9 +45,22 @@ export declare const CreateUserSchema: z.ZodObject<{
     email: string;
     name: string;
     password: string;
-    role?: "organizer" | "participant" | undefined;
+    role?: "participant" | undefined;
     organizationName?: string | undefined;
     phoneNumber?: string | undefined;
+}>;
+export declare const OrganizerUpgradeSchema: z.ZodObject<{
+    organizationName: z.ZodString;
+    phoneNumber: z.ZodOptional<z.ZodString>;
+    description: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    organizationName: string;
+    phoneNumber?: string | undefined;
+    description?: string | undefined;
+}, {
+    organizationName: string;
+    phoneNumber?: string | undefined;
+    description?: string | undefined;
 }>;
 export declare const LoginSchema: z.ZodObject<{
     email: z.ZodString;
@@ -66,6 +79,8 @@ export declare const EventSchema: z.ZodObject<{
     startDate: z.ZodDate;
     endDate: z.ZodDate;
     location: z.ZodString;
+    latitude: z.ZodOptional<z.ZodNumber>;
+    longitude: z.ZodOptional<z.ZodNumber>;
     capacity: z.ZodNumber;
     categoryId: z.ZodOptional<z.ZodString>;
     bannerUrl: z.ZodOptional<z.ZodString>;
@@ -80,8 +95,8 @@ export declare const EventSchema: z.ZodObject<{
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    title: string;
     description: string;
+    title: string;
     startDate: Date;
     endDate: Date;
     location: string;
@@ -89,6 +104,8 @@ export declare const EventSchema: z.ZodObject<{
     visibility: "public" | "private" | "invite-only";
     organizerId: string;
     isPaid: boolean;
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
     registrationDeadline?: Date | undefined;
@@ -97,14 +114,16 @@ export declare const EventSchema: z.ZodObject<{
     id: string;
     createdAt: Date;
     updatedAt: Date;
-    title: string;
     description: string;
+    title: string;
     startDate: Date;
     endDate: Date;
     location: string;
     capacity: number;
     visibility: "public" | "private" | "invite-only";
     organizerId: string;
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
     registrationDeadline?: Date | undefined;
@@ -117,6 +136,8 @@ export declare const CreateEventSchema: z.ZodObject<{
     startDate: z.ZodEffects<z.ZodString, Date, string>;
     endDate: z.ZodEffects<z.ZodString, Date, string>;
     location: z.ZodString;
+    latitude: z.ZodOptional<z.ZodNumber>;
+    longitude: z.ZodOptional<z.ZodNumber>;
     capacity: z.ZodNumber;
     categoryId: z.ZodOptional<z.ZodString>;
     bannerUrl: z.ZodOptional<z.ZodString>;
@@ -125,26 +146,30 @@ export declare const CreateEventSchema: z.ZodObject<{
     isPaid: z.ZodDefault<z.ZodBoolean>;
     price: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
-    title: string;
     description: string;
+    title: string;
     startDate: Date;
     endDate: Date;
     location: string;
     capacity: number;
     visibility: "public" | "private" | "invite-only";
     isPaid: boolean;
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
     registrationDeadline?: Date | undefined;
     price?: number | undefined;
 }, {
-    title: string;
     description: string;
+    title: string;
     startDate: string;
     endDate: string;
     location: string;
     capacity: number;
     visibility: "public" | "private" | "invite-only";
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
     registrationDeadline?: string | undefined;
@@ -157,6 +182,8 @@ export declare const UpdateEventSchema: z.ZodObject<{
     startDate: z.ZodOptional<z.ZodEffects<z.ZodString, Date, string>>;
     endDate: z.ZodOptional<z.ZodEffects<z.ZodString, Date, string>>;
     location: z.ZodOptional<z.ZodString>;
+    latitude: z.ZodOptional<z.ZodNumber>;
+    longitude: z.ZodOptional<z.ZodNumber>;
     capacity: z.ZodOptional<z.ZodNumber>;
     categoryId: z.ZodOptional<z.ZodString>;
     bannerUrl: z.ZodOptional<z.ZodString>;
@@ -165,11 +192,13 @@ export declare const UpdateEventSchema: z.ZodObject<{
     isPaid: z.ZodOptional<z.ZodBoolean>;
     price: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
-    title?: string | undefined;
     description?: string | undefined;
+    title?: string | undefined;
     startDate?: Date | undefined;
     endDate?: Date | undefined;
     location?: string | undefined;
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     capacity?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
@@ -178,11 +207,13 @@ export declare const UpdateEventSchema: z.ZodObject<{
     isPaid?: boolean | undefined;
     price?: number | undefined;
 }, {
-    title?: string | undefined;
     description?: string | undefined;
+    title?: string | undefined;
     startDate?: string | undefined;
     endDate?: string | undefined;
     location?: string | undefined;
+    latitude?: number | undefined;
+    longitude?: number | undefined;
     capacity?: number | undefined;
     categoryId?: string | undefined;
     bannerUrl?: string | undefined;
@@ -415,7 +446,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: z.ZodRecord<z.ZodString, z.ZodAny>;
     status: z.ZodEnum<["pending", "confirmed", "cancelled", "attended"]>;
     qrCode: z.ZodString;
-    paymentStatus: z.ZodOptional<z.ZodEnum<["pending", "completed", "failed", "not_required"]>>;
+    paymentStatus: z.ZodOptional<z.ZodNullable<z.ZodEnum<["pending", "completed", "failed", "refunded"]>>>;
     paymentId: z.ZodOptional<z.ZodString>;
     createdAt: z.ZodDate;
     updatedAt: z.ZodDate;
@@ -430,7 +461,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: Record<string, any>;
     qrCode: string;
     userId?: string | undefined;
-    paymentStatus?: "pending" | "completed" | "failed" | "not_required" | undefined;
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded" | null | undefined;
     paymentId?: string | undefined;
 }, {
     id: string;
@@ -443,7 +474,7 @@ export declare const RegistrationSchema: z.ZodObject<{
     responses: Record<string, any>;
     qrCode: string;
     userId?: string | undefined;
-    paymentStatus?: "pending" | "completed" | "failed" | "not_required" | undefined;
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded" | null | undefined;
     paymentId?: string | undefined;
 }>;
 export declare const CreateRegistrationSchema: z.ZodObject<{

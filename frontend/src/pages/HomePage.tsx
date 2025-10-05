@@ -116,7 +116,7 @@ const HomePage: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-                Why choose EventPro?
+                Why choose eventbase?
               </h2>
               <p className="text-lg text-gray-600 mb-8">
                 Our platform is designed to streamline every aspect of event
@@ -137,7 +137,7 @@ const HomePage: React.FC = () => {
                 Ready to get started?
               </h3>
               <p className="text-gray-600 mb-6">
-                Join thousands of event organizers who trust EventPro to manage
+                Join thousands of event organizers who trust eventbase to manage
                 their events.
               </p>
               <Link

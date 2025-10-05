@@ -43,8 +43,23 @@ export const useAuth = () => {
             errorMessage =
               "Invalid email or password. Please check your credentials and try again.";
           } else if (error.status === 403) {
-            errorMessage =
-              "Your account has been disabled. Please contact support for assistance.";
+            // Check if this is an email verification issue
+            const responseData = error.response as any;
+            if (responseData?.requiresVerification) {
+              if (responseData?.verificationEmailSent) {
+                errorMessage =
+                  "Please verify your email address. We've sent a new verification email to your inbox.";
+                toast.success(
+                  "New verification email sent! Please check your inbox."
+                );
+              } else {
+                errorMessage =
+                  "Please verify your email address before logging in. Check your inbox for verification instructions.";
+              }
+            } else {
+              errorMessage =
+                "Your account has been disabled. Please contact support for assistance.";
+            }
           } else if (error.status === 429) {
             errorMessage =
               "Too many login attempts. Please wait a few minutes and try again.";
@@ -86,11 +101,20 @@ export const useAuth = () => {
 
         const response = await AuthService.register(data);
 
-        if (response.success && response.data) {
-          setAuth(response.data.user, response.data.accessToken);
-          toast.success("Account created successfully!");
-          navigate("/dashboard");
-          return true;
+        if (response.success) {
+          if (response.data?.requiresVerification) {
+            toast.success(
+              "Account created! Please check your email for verification instructions."
+            );
+            navigate("/login");
+            return true;
+          } else if (response.data?.user && response.data?.accessToken) {
+            // Legacy flow - direct authentication (shouldn't happen with new flow)
+            setAuth(response.data.user, response.data.accessToken);
+            toast.success("Account created successfully!");
+            navigate("/dashboard");
+            return true;
+          }
         } else {
           throw new Error(response.error || "Registration failed");
         }
@@ -215,6 +239,7 @@ export const useAuth = () => {
     logout,
     refreshToken,
     checkAuthStatus,
+    updateUser,
 
     // Utility functions
     isOrganizer: user?.role === "organizer" || user?.role === "admin",

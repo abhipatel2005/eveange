@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 
 // Import routes
 import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/users.js";
 import eventRoutes from "./routes/events.js";
 import registrationRoutes from "./routes/registrations.js";
 import registrationFormRoutes from "./routes/registrationForms.js";
@@ -18,6 +19,7 @@ import checkinRoutes from "./routes/checkin.js";
 import emailAuthRoutes from "./routes/emailAuth.js";
 import staffRoutes from "./routes/staff.js";
 import paymentRoutes from "./routes/payments.js";
+import mapsRoutes from "./routes/maps.js";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -71,6 +73,7 @@ app.get("/api/health", (req, res) => {
 
 // API Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/registrations", registrationRoutes);
 app.use("/api/registration-forms", registrationFormRoutes);
@@ -81,6 +84,7 @@ app.use("/api/checkin", checkinRoutes);
 app.use("/api/email", emailAuthRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/maps", mapsRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {

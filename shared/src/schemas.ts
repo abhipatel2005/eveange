@@ -16,9 +16,16 @@ export const CreateUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1),
-  role: z.enum(["organizer", "participant"]).default("participant"),
+  role: z.enum(["participant"]).default("participant"), // Everyone starts as participant
   organizationName: z.string().optional(),
   phoneNumber: z.string().optional(),
+});
+
+// New schema for organizer upgrade
+export const OrganizerUpgradeSchema = z.object({
+  organizationName: z.string().min(1, "Organization name is required"),
+  phoneNumber: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export const LoginSchema = z.object({
@@ -34,6 +41,8 @@ export const EventSchema = z.object({
   startDate: z.date(),
   endDate: z.date(),
   location: z.string(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   capacity: z.number().positive(),
   categoryId: z.string().uuid().optional(),
   bannerUrl: z.string().url().optional(),
@@ -52,6 +61,8 @@ export const CreateEventSchema = z.object({
   startDate: z.string().transform((val) => new Date(val)),
   endDate: z.string().transform((val) => new Date(val)),
   location: z.string().min(1),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   capacity: z.number().positive(),
   categoryId: z.string().uuid().optional(),
   bannerUrl: z.string().url().optional(),
@@ -76,6 +87,8 @@ export const UpdateEventSchema = z.object({
     .transform((val) => new Date(val))
     .optional(),
   location: z.string().min(1).optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   capacity: z.number().positive().optional(),
   categoryId: z.string().uuid().optional(),
   bannerUrl: z.string().url().optional(),
@@ -154,7 +167,8 @@ export const RegistrationSchema = z.object({
   status: z.enum(["pending", "confirmed", "cancelled", "attended"]),
   qrCode: z.string(),
   paymentStatus: z
-    .enum(["pending", "completed", "failed", "not_required"])
+    .enum(["pending", "completed", "failed", "refunded"])
+    .nullable()
     .optional(),
   paymentId: z.string().optional(),
   createdAt: z.date(),

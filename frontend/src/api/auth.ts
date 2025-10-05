@@ -11,13 +11,20 @@ export interface RegisterData {
   password: string;
   name: string;
   role: "participant" | "organizer";
-  organizationName?: string;
-  phoneNumber?: string;
 }
 
 export interface AuthResponse {
   user: User;
   accessToken: string;
+}
+
+export interface RegistrationResponse {
+  email?: string;
+  requiresVerification?: boolean;
+  emailError?: boolean;
+  // Legacy fields for backward compatibility
+  user?: User;
+  accessToken?: string;
 }
 
 export class AuthService {
@@ -27,8 +34,8 @@ export class AuthService {
 
   static async register(
     data: RegisterData
-  ): Promise<ApiResponse<AuthResponse>> {
-    return apiClient.post<AuthResponse>("/auth/register", data);
+  ): Promise<ApiResponse<RegistrationResponse>> {
+    return apiClient.post<RegistrationResponse>("/auth/register", data);
   }
 
   static async logout(): Promise<ApiResponse<void>> {

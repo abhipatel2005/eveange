@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/authStore";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
 import { StaffManagement } from "../components/admin/StaffManagement";
+import MapDisplay from "../components/ui/MapDisplay";
 
 const EventDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ const EventDetailsPage: React.FC = () => {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -56,7 +58,7 @@ const EventDetailsPage: React.FC = () => {
     // For free events, registration should be confirmed or payment not required
     const isValidFreeRegistration =
       registration.status === "confirmed" ||
-      registration.payment_status === "not_required";
+      registration.payment_status === null;
 
     console.log(
       `🆓 Free event - valid registration: ${isValidFreeRegistration}`
@@ -85,7 +87,7 @@ const EventDetailsPage: React.FC = () => {
     // For free events, registration should be confirmed or payment not required
     const isValidFreeRegistration =
       registration.status === "confirmed" ||
-      registration.payment_status === "not_required";
+      registration.payment_status === null;
 
     return isValidFreeRegistration ? registration : undefined;
   };
@@ -980,16 +982,53 @@ const EventDetailsPage: React.FC = () => {
                           />
                         </svg>
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-4 flex-1">
                         <h3 className="font-semibold text-slate-900 mb-2">
                           Location
                         </h3>
-                        <p className="text-slate-600 font-medium">
+                        <p className="text-slate-600 font-medium mb-3">
                           {event.location}
                         </p>
-                        <button className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-1">
-                          View on Map →
-                        </button>
+
+                        {/* Map toggle and display */}
+                        {event.latitude && event.longitude ? (
+                          <div className="space-y-4">
+                            <button
+                              onClick={() => setShowMap(!showMap)}
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              {showMap ? "Hide Map" : "View on Map →"}
+                            </button>
+
+                            {showMap && (
+                              <div className="mt-4">
+                                <MapDisplay
+                                  latitude={event.latitude}
+                                  longitude={event.longitude}
+                                  address={event.location}
+                                  eventTitle={event.title}
+                                  height="250px"
+                                  className="rounded-lg overflow-hidden shadow-sm"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              // Open Google Maps search for the location
+                              window.open(
+                                `https://www.google.com/maps/search/${encodeURIComponent(
+                                  event.location
+                                )}`,
+                                "_blank"
+                              );
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Search on Maps →
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

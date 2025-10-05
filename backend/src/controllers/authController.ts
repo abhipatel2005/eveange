@@ -1,15 +1,11 @@
 import { Request, Response } from "express";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { AuthUtils } from "../utils/auth.js";
 import { LoginSchema, CreateUserSchema } from "../../../shared/dist/schemas.js";
+import EmailService from "../services/emailService.js";
+import { supabase, supabaseAdmin } from "../config/supabase.js";
 import dotenv from "dotenv";
 dotenv.config();
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
 
 export class AuthController {
   static async register(req: Request, res: Response): Promise<void> {
@@ -18,7 +14,7 @@ export class AuthController {
       const validatedData = CreateUserSchema.parse(req.body);
 
       // Check if user already exists
-      const { data: existingUser } = await supabase
+      const { data: existingUser } = await supabaseAdmin
         .from("users")
         .select("email")
         .eq("email", validatedData.email)
@@ -38,15 +34,13 @@ export class AuthController {
       );
 
       // Create user in Supabase
-      const { data: user, error } = await supabase
+      const { data: user, error } = await supabaseAdmin
         .from("users")
         .insert({
           email: validatedData.email,
           password_hash: hashedPassword,
           name: validatedData.name,
           role: validatedData.role,
-          organization_name: validatedData.organizationName,
-          phone_number: validatedData.phoneNumber,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -64,37 +58,41 @@ export class AuthController {
         return;
       }
 
-      // Generate tokens
-      const tokens = AuthUtils.generateTokens({
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-      });
+      // Generate verification token and send email
+      try {
+        const verificationToken = await EmailService.generateVerificationToken(
+          user.id
+        );
+        console.log(verificationToken);
+        await EmailService.sendVerificationEmail(
+          user.email,
+          user.name,
+          verificationToken
+        );
 
-      // Set refresh token as httpOnly cookie
-      res.cookie("refreshToken", tokens.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
-
-      res.status(201).json({
-        success: true,
-        message: "Account created successfully",
-        data: {
-          user: {
-            id: user.id,
+        res.status(201).json({
+          success: true,
+          message:
+            "Account created successfully. Please check your email for verification instructions.",
+          data: {
             email: user.email,
-            name: user.name,
-            role: user.role,
-            organizationName: user.organization_name,
-            phoneNumber: user.phone_number,
-            createdAt: user.created_at,
+            requiresVerification: true,
           },
-          accessToken: tokens.accessToken,
-        },
-      });
+        });
+      } catch (emailError) {
+        console.error("Failed to send verification email:", emailError);
+        // Still return success but indicate email issue
+        res.status(201).json({
+          success: true,
+          message:
+            "Account created successfully, but verification email could not be sent. Please contact support.",
+          data: {
+            email: user.email,
+            requiresVerification: true,
+            emailError: true,
+          },
+        });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({
@@ -119,10 +117,10 @@ export class AuthController {
       const validatedData = LoginSchema.parse(req.body);
 
       // Find user by email
-      const { data: user, error } = await supabase
+      const { data: user, error } = await supabaseAdmin
         .from("users")
         .select(
-          "id, email, password_hash, name, role, organization_name, phone_number"
+          "id, email, password_hash, name, role, organization_name, phone_number, email_verified, is_active"
         )
         .eq("email", validatedData.email)
         .single();
@@ -149,8 +147,57 @@ export class AuthController {
         return;
       }
 
+      // Check if account is active
+      if (!user.is_active) {
+        res.status(403).json({
+          success: false,
+          error:
+            "Your account has been disabled. Please contact support for assistance.",
+        });
+        return;
+      }
+
+      // Check if email is verified
+      if (!user.email_verified) {
+        try {
+          // Generate new verification token and send email
+          console.log(
+            "🔄 Generating new verification token for unverified user:",
+            user.email
+          );
+          const verificationToken =
+            await EmailService.generateVerificationToken(user.id);
+          await EmailService.sendVerificationEmail(
+            user.email,
+            user.name,
+            verificationToken
+          );
+
+          console.log("✅ Verification email sent to unverified user");
+          res.status(403).json({
+            success: false,
+            error:
+              "Please verify your email address before logging in. We've sent a new verification email to your inbox.",
+            requiresVerification: true,
+            email: user.email,
+            verificationEmailSent: true,
+          });
+        } catch (emailError) {
+          console.error("❌ Failed to send verification email:", emailError);
+          res.status(403).json({
+            success: false,
+            error:
+              "Please verify your email address before logging in. Please contact support if you need help.",
+            requiresVerification: true,
+            email: user.email,
+            verificationEmailSent: false,
+          });
+        }
+        return;
+      }
+
       // Update last login
-      await supabase
+      await supabaseAdmin
         .from("users")
         .update({
           last_login_at: new Date().toISOString(),
@@ -240,7 +287,7 @@ export class AuthController {
       const decoded = AuthUtils.verifyToken(refreshToken, true);
 
       // Get user from database
-      const { data: user, error } = await supabase
+      const { data: user, error } = await supabaseAdmin
         .from("users")
         .select("id, email, role")
         .eq("id", decoded.userId)
@@ -297,7 +344,7 @@ export class AuthController {
         return;
       }
 
-      const { data: user, error } = await supabase
+      const { data: user, error } = await supabaseAdmin
         .from("users")
         .select(
           "id, email, name, role, organization_name, phone_number, created_at, updated_at, last_login_at"
@@ -331,6 +378,115 @@ export class AuthController {
       });
     } catch (error) {
       console.error("Get profile error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+
+  static async verifyEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.query;
+      console.log("🔍 Email verification request received for token:", token);
+
+      if (!token || typeof token !== "string") {
+        console.log("❌ Invalid token provided");
+        res.status(400).json({
+          success: false,
+          error: "Verification token is required",
+        });
+        return;
+      }
+
+      console.log("🔄 Calling EmailService.verifyEmailToken...");
+      const result = await EmailService.verifyEmailToken(token);
+      console.log("📋 EmailService result:", result);
+
+      if (result.success) {
+        console.log("✅ Email verification successful");
+        res.status(200).json({
+          success: true,
+          message: "Email verified successfully! You can now log in.",
+        });
+      } else {
+        console.log("❌ Email verification failed:", result.error);
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error("Email verification controller error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+
+  static async resendVerification(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: "Email is required",
+        });
+        return;
+      }
+
+      const result = await EmailService.resendVerificationEmail(email);
+
+      if (result.success) {
+        res.status(200).json({
+          success: true,
+          message:
+            "Verification email sent successfully. Please check your inbox.",
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+
+  // Debug endpoint to check email verifications table
+  static async debugEmailVerifications(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { data: verifications, error } = await supabaseAdmin
+        .from("email_verifications")
+        .select("*")
+        .limit(10);
+
+      if (error) {
+        res.status(500).json({
+          success: false,
+          error: `Database error: ${error.message}`,
+          details: error,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: verifications,
+        count: verifications?.length || 0,
+      });
+    } catch (error) {
+      console.error("Debug endpoint error:", error);
       res.status(500).json({
         success: false,
         error: "Internal server error",

@@ -11,11 +11,6 @@ const RegisterSchema = z
     email: z.string().email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
-    role: z.enum(["participant", "organizer"], {
-      errorMap: () => ({ message: "Please select a role" }),
-    }),
-    organizationName: z.string().optional(),
-    phoneNumber: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -34,16 +29,10 @@ const RegisterPage = () => {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<RegisterData>({
     resolver: zodResolver(RegisterSchema),
-    defaultValues: {
-      role: "participant",
-    },
   });
-
-  const selectedRole = watch("role");
 
   // Redirect if already authenticated
   if (isAuthenticated) {
@@ -51,7 +40,12 @@ const RegisterPage = () => {
   }
 
   const onSubmit = async (data: RegisterData) => {
-    const { confirmPassword, ...registerData } = data;
+    const { confirmPassword, ...formData } = data;
+    // Everyone starts as participant - no role selection needed
+    const registerData = {
+      ...formData,
+      role: "participant" as const,
+    };
     await registerUser(registerData);
   };
 
@@ -119,67 +113,6 @@ const RegisterPage = () => {
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">
                   {errors.email.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Account Type
-              </label>
-              <select {...register("role")} className="input">
-                <option value="participant">Participant</option>
-                <option value="organizer">Event Organizer</option>
-              </select>
-              {errors.role && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.role.message}
-                </p>
-              )}
-            </div>
-
-            {selectedRole === "organizer" && (
-              <div>
-                <label
-                  htmlFor="organizationName"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Organization Name
-                </label>
-                <input
-                  {...register("organizationName")}
-                  type="text"
-                  className="input"
-                  placeholder="Enter your organization name"
-                />
-                {errors.organizationName && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.organizationName.message}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="phoneNumber"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Phone Number (Optional)
-              </label>
-              <input
-                {...register("phoneNumber")}
-                type="tel"
-                autoComplete="tel"
-                className="input"
-                placeholder="Enter your phone number"
-              />
-              {errors.phoneNumber && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.phoneNumber.message}
                 </p>
               )}
             </div>

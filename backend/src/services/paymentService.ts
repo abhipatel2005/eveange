@@ -535,9 +535,7 @@ export class PaymentService {
       // Prepare email template data
       const eventDate = new Date(event.start_date).toLocaleDateString();
       const eventTime = new Date(event.start_date).toLocaleTimeString();
-      const ticketUrl = `${
-        process.env.FRONTEND_URL || "http://localhost:5173"
-      }/ticket/${registration.id}`;
+      const ticketUrl = `https://eventbase.abhipatel.site/ticket/${registration.id}`;
 
       const emailData: EmailTemplateData = {
         participantName: registration.name || "Participant",

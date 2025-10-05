@@ -68,13 +68,13 @@ export class PaymentService {
             const { data: payment, error: paymentError } = await supabase
                 .from("payments")
                 .insert({
-                registration_id: registrationId,
-                event_id: eventId,
-                user_id: userId,
-                amount: amount,
-                currency: currency,
-                status: "pending",
-            })
+                    registration_id: registrationId,
+                    event_id: eventId,
+                    user_id: userId,
+                    amount: amount,
+                    currency: currency,
+                    status: "pending",
+                })
                 .select()
                 .single();
             if (paymentError || !payment) {
@@ -101,8 +101,8 @@ export class PaymentService {
             await supabase
                 .from("payments")
                 .update({
-                gateway_payment_id: paymentIntent.id,
-            })
+                    gateway_payment_id: paymentIntent.id,
+                })
                 .eq("id", payment.id);
             return {
                 paymentId: payment.id,
@@ -143,16 +143,16 @@ export class PaymentService {
             const { error: updateError } = await supabase
                 .from("payments")
                 .update({
-                status: "completed",
-                gateway_payment_id: paymentIntentId,
-                gateway_response: {
-                    paymentIntentId: paymentIntentId,
-                    paymentMethodId: paymentMethodId,
-                    status: paymentIntent.status,
-                    amount_received: paymentIntent.amount_received,
-                },
-                payment_date: new Date().toISOString(),
-            })
+                    status: "completed",
+                    gateway_payment_id: paymentIntentId,
+                    gateway_response: {
+                        paymentIntentId: paymentIntentId,
+                        paymentMethodId: paymentMethodId,
+                        status: paymentIntent.status,
+                        amount_received: paymentIntent.amount_received,
+                    },
+                    payment_date: new Date().toISOString(),
+                })
                 .eq("id", paymentId);
             if (updateError) {
                 console.error("💥 Payment update error details:", updateError);
@@ -162,10 +162,10 @@ export class PaymentService {
             const { error: regUpdateError } = await supabase
                 .from("registrations")
                 .update({
-                payment_status: "completed",
-                status: "confirmed",
-                updated_at: new Date().toISOString(),
-            })
+                    payment_status: "completed",
+                    status: "confirmed",
+                    updated_at: new Date().toISOString(),
+                })
                 .eq("id", payment.registration_id);
             if (regUpdateError) {
                 console.error("💥 Registration update error details:", regUpdateError);
@@ -296,14 +296,14 @@ export class PaymentService {
             const { error: paymentUpdateError } = await supabase
                 .from("payments")
                 .update({
-                status: "completed",
-                gateway_response: {
-                    paymentIntentId: paymentIntent.id,
-                    status: paymentIntent.status,
-                    amount_received: paymentIntent.amount_received,
-                },
-                payment_date: new Date().toISOString(),
-            })
+                    status: "completed",
+                    gateway_response: {
+                        paymentIntentId: paymentIntent.id,
+                        status: paymentIntent.status,
+                        amount_received: paymentIntent.amount_received,
+                    },
+                    payment_date: new Date().toISOString(),
+                })
                 .eq("id", paymentId);
             if (paymentUpdateError) {
                 console.error("💥 Webhook payment update error:", paymentUpdateError);
@@ -315,10 +315,10 @@ export class PaymentService {
                 const { error: regUpdateError } = await supabase
                     .from("registrations")
                     .update({
-                    payment_status: "completed",
-                    status: "confirmed",
-                    updated_at: new Date().toISOString(),
-                })
+                        payment_status: "completed",
+                        status: "confirmed",
+                        updated_at: new Date().toISOString(),
+                    })
                     .eq("id", registrationId);
                 if (regUpdateError) {
                     console.error("💥 Webhook registration update error:", regUpdateError);
@@ -350,13 +350,13 @@ export class PaymentService {
             const { error: failureUpdateError } = await supabase
                 .from("payments")
                 .update({
-                status: "failed",
-                gateway_response: {
-                    paymentIntentId: paymentIntent.id,
-                    status: paymentIntent.status,
-                    last_payment_error: paymentIntent.last_payment_error,
-                },
-            })
+                    status: "failed",
+                    gateway_response: {
+                        paymentIntentId: paymentIntent.id,
+                        status: paymentIntent.status,
+                        last_payment_error: paymentIntent.last_payment_error,
+                    },
+                })
                 .eq("id", paymentId);
             if (failureUpdateError) {
                 console.error("💥 Webhook failure update error:", failureUpdateError);
@@ -415,7 +415,7 @@ export class PaymentService {
             // Prepare email template data
             const eventDate = new Date(event.start_date).toLocaleDateString();
             const eventTime = new Date(event.start_date).toLocaleTimeString();
-            const ticketUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/ticket/${registration.id}`;
+            const ticketUrl = `https://eventbase.abhipatel.site/ticket/${registration.id}`;
             const emailData = {
                 participantName: registration.name || "Participant",
                 eventTitle: event.title,

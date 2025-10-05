@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   Calendar,
   MapPin,
-  Clock,
   Search,
   Plus,
   Eye,
@@ -12,7 +11,6 @@ import {
 } from "lucide-react";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
-import { formatDate } from "../utils/dateUtils";
 import { useAuth } from "../hooks/useAuth";
 
 const EventsPage: React.FC = () => {
@@ -27,6 +25,9 @@ const EventsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showUpcomingOnly, setShowUpcomingOnly] = useState(true);
+  const [registering, setRegistering] = useState<{ [key: string]: boolean }>(
+    {}
+  );
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -75,6 +76,30 @@ const EventsPage: React.FC = () => {
     fetchEvents();
   };
 
+  const handleQuickRegister = async (eventId: string) => {
+    if (!user) return;
+
+    setRegistering((prev) => ({ ...prev, [eventId]: true }));
+
+    try {
+      const response = await RegistrationService.registerForEvent(eventId, {
+        formData: {}, // Empty form data for quick registration
+      });
+
+      if (response.success) {
+        // Refresh data
+        fetchEvents();
+        fetchUserRegistrations();
+      } else {
+        setError("Failed to register for event");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to register for event");
+    } finally {
+      setRegistering((prev) => ({ ...prev, [eventId]: false }));
+    }
+  };
+
   const isUserRegistered = (eventId: string) => {
     const registration = userRegistrations.find(
       (registration) =>
@@ -92,7 +117,7 @@ const EventsPage: React.FC = () => {
     // For free events, registration should be confirmed or payment not required
     return (
       registration.status === "confirmed" ||
-      registration.payment_status === "not_required"
+      registration.payment_status === null
     );
   };
 
@@ -115,7 +140,7 @@ const EventsPage: React.FC = () => {
     // For free events, registration should be confirmed or payment not required
     const isValidFreeRegistration =
       registration.status === "confirmed" ||
-      registration.payment_status === "not_required";
+      registration.payment_status === null;
 
     return isValidFreeRegistration ? registration : undefined;
   };
@@ -133,7 +158,22 @@ const EventsPage: React.FC = () => {
   };
 
   const getRegistrationCount = (event: Event) => {
-    return event.registrations?.length || 0;
+    if (!event.registrations) return 0;
+
+    // If it's an array of registration objects
+    if (Array.isArray(event.registrations)) {
+      // Check if it's a count array [{count: 5}] or actual registrations
+      if (
+        event.registrations.length > 0 &&
+        typeof event.registrations[0] === "object" &&
+        "count" in event.registrations[0]
+      ) {
+        return (event.registrations[0] as any).count || 0;
+      }
+      return event.registrations.length;
+    }
+
+    return 0;
   };
 
   if (isLoading && events.length === 0) {
@@ -149,32 +189,56 @@ const EventsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
+      {/* Clean Header - EventBrite Style */}
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Events</h1>
-              <p className="mt-2 text-gray-600">
-                Discover and register for upcoming events
+          {/* Top Section - Title and Search */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Discover Events
+              </h1>
+              <p className="text-gray-600">
+                Find amazing events happening around you
               </p>
             </div>
 
+            {/* Search Bar - Positioned beside title */}
+            {/* <div className="flex-1 max-w-md">
+              <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search events..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Search
+                </button>
+              </form>
+            </div> */}
+
             {/* Action Buttons */}
-            <div className="mt-4 md:mt-0 flex gap-3">
-              {user && (
+            <div className="flex gap-3">
+              {/* {user && (
                 <Link
                   to="/my-registrations"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="inline-flex items-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
                   <Eye className="w-4 h-4 mr-2" />
-                  My Registrations
+                  My Events
                 </Link>
-              )}
+              )} */}
 
               {user && (user.role === "organizer" || user.role === "admin") && (
                 <Link
                   to="/events/create"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  className="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Event
@@ -183,39 +247,74 @@ const EventsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search and Filters */}
-          <div className="mt-6 flex flex-col sm:flex-row gap-4">
-            <form onSubmit={handleSearch} className="flex-1 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          {/* Filters Section - Below title */}
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex-1">
+              <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Search events..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500"
                 />
-              </div>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Search
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Search
+                </button>
+              </form>
+            </div>
+            {/* <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={showUpcomingOnly}
+                onChange={(e) => setShowUpcomingOnly(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                Upcoming events only
+              </span>
+            </label> */}
 
-            <div className="flex items-center gap-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={showUpcomingOnly}
-                  onChange={(e) => setShowUpcomingOnly(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">
-                  Upcoming only
-                </span>
-              </label>
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setShowUpcomingOnly(true);
+                  setPage(1);
+                  fetchEvents();
+                }}
+                className="text-sm px-4 py-2 bg-primary-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                All Events
+              </button>
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setShowUpcomingOnly(true);
+                  setPage(1);
+                  fetchEvents();
+                }}
+                className="text-sm px-4 py-2 bg-green-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Free Events
+              </button>
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setShowUpcomingOnly(true);
+                  setPage(1);
+                  fetchEvents();
+                }}
+                className="text-sm px-4 py-2 bg-purple-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                This Week
+              </button>
             </div>
           </div>
         </div>
@@ -254,7 +353,8 @@ const EventsPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* EventBrite Style Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {events.map((event) => {
                 const eventStatus = getEventStatus(event);
                 const registrationCount = getRegistrationCount(event);
@@ -262,112 +362,117 @@ const EventsPage: React.FC = () => {
                 return (
                   <div
                     key={event.id}
-                    className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 overflow-hidden group cursor-pointer"
                   >
-                    {/* Event Banner */}
-                    {event.banner_url ? (
-                      <img
-                        src={event.banner_url}
-                        alt={event.title}
-                        className="w-full h-48 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                        <Calendar className="w-16 h-16 text-white" />
-                      </div>
-                    )}
+                    {/* Event Image */}
+                    <div className="relative h-40 bg-gray-100 overflow-hidden">
+                      {event.banner_url ? (
+                        <img
+                          src={event.banner_url}
+                          alt={event.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                          <Calendar className="w-12 h-12 text-white" />
+                        </div>
+                      )}
 
-                    {/* Event Content */}
-                    <div className="p-6">
-                      {/* Status Badge */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            eventStatus.color === "green"
-                              ? "bg-green-100 text-green-800"
-                              : eventStatus.color === "blue"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {eventStatus.status}
+                      {/* Price Badge */}
+                      <div className="absolute top-3 left-3">
+                        <span className="bg-white text-gray-900 px-2 py-1 rounded-md text-sm font-semibold shadow-sm">
+                          {event.is_paid ? `$${event.price}` : "FREE"}
                         </span>
+                      </div>
+                    </div>
 
-                        {event.is_paid && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            ${event.price}
-                          </span>
+                    {/* Card Content */}
+                    <div className="p-4">
+                      {/* Date */}
+                      <div className="text-sm font-medium text-orange-600 mb-2">
+                        {new Date(event.start_date).toLocaleDateString(
+                          "en-US",
+                          {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          }
                         )}
                       </div>
 
-                      {/* Event Title */}
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                      {/* Title */}
+                      <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                         {event.title}
                       </h3>
 
-                      {/* Event Description */}
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                        {event.description}
-                      </p>
-
-                      {/* Event Details */}
-                      <div className="space-y-2 text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-2" />
-                          <span>{formatDate(event.start_date)}</span>
-                        </div>
-
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-2" />
-                          <span>
-                            {new Date(event.start_date).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-2" />
-                          <span className="truncate">{event.location}</span>
-                        </div>
-
-                        <div className="flex items-center">
-                          <Users className="w-4 h-4 mr-2" />
-                          <span>
-                            {registrationCount} / {event.capacity} registered
-                          </span>
-                        </div>
+                      {/* Location */}
+                      <div className="flex items-center text-gray-600 text-sm mb-3">
+                        <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                        <span className="truncate">{event.location}</span>
                       </div>
 
-                      {/* Event Actions */}
-                      <div className="mt-6">
+                      {/* Attendees Count */}
+                      <div className="flex items-center text-gray-500 text-sm mb-4">
+                        <Users className="w-4 h-4 mr-1" />
+                        <span>{registrationCount || 0} going</span>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="space-y-2">
+                        <Link
+                          to={`/events/${event.id}`}
+                          className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                        >
+                          View Details
+                        </Link>
+
                         {user && isUserRegistered(event.id) ? (
-                          // User is registered - show ticket button
-                          <div className="space-y-2">
-                            <Link
-                              to={`/ticket/${
-                                getUserRegistrationForEvent(event.id)?.id
-                              }`}
-                              className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                            >
-                              <Ticket className="w-4 h-4 mr-2" />
-                              View Ticket
-                            </Link>
-                            <Link
-                              to={`/events/${event.id}`}
-                              className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                            >
-                              Event Details
-                            </Link>
-                          </div>
-                        ) : (
-                          // User not registered or not logged in - show view details/register
                           <Link
-                            to={`/events/${event.id}`}
-                            className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                            to={`/ticket/${
+                              getUserRegistrationForEvent(event.id)?.id
+                            }`}
+                            className="w-full inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
                           >
-                            {user ? "Register Now" : "View Details"}
+                            <Ticket className="w-4 h-4 mr-2" />
+                            View Ticket
+                          </Link>
+                        ) : eventStatus.status === "ended" ? (
+                          <button
+                            disabled
+                            className="w-full px-4 py-2 text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed"
+                          >
+                            Event Ended
+                          </button>
+                        ) : registrationCount &&
+                          event.capacity &&
+                          registrationCount >= event.capacity ? (
+                          <button
+                            disabled
+                            className="w-full px-4 py-2 text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed"
+                          >
+                            Event Full
+                          </button>
+                        ) : user ? (
+                          <button
+                            onClick={() => handleQuickRegister(event.id)}
+                            disabled={registering[event.id]}
+                            className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {registering[event.id] ? (
+                              <div className="flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Registering...
+                              </div>
+                            ) : (
+                              "Register Now"
+                            )}
+                          </button>
+                        ) : (
+                          <Link
+                            to="/login"
+                            className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            Login to Register
                           </Link>
                         )}
                       </div>
@@ -377,38 +482,44 @@ const EventsPage: React.FC = () => {
               })}
             </div>
 
-            {/* Pagination */}
+            {/* Enhanced Pagination */}
             {totalPages > 1 && (
               <div className="mt-8 flex justify-center">
-                <nav className="flex items-center space-x-2">
+                <nav className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   <button
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page === 1}
-                    className="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border-r border-gray-200"
                   >
                     Previous
                   </button>
 
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setPage(pageNum)}
-                        className={`px-3 py-2 text-sm font-medium rounded-md ${
-                          page === pageNum
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    )
-                  )}
+                  <div className="flex">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (pageNum) => (
+                        <button
+                          key={pageNum}
+                          onClick={() => setPage(pageNum)}
+                          className={`px-4 py-3 text-sm font-medium transition-colors ${
+                            page === pageNum
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-700 hover:bg-gray-50"
+                          } ${
+                            pageNum < totalPages
+                              ? "border-r border-gray-200"
+                              : ""
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    )}
+                  </div>
 
                   <button
                     onClick={() => setPage(Math.min(totalPages, page + 1))}
                     disabled={page === totalPages}
-                    className="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border-l border-gray-200"
                   >
                     Next
                   </button>

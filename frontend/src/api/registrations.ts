@@ -4,12 +4,7 @@ import type { ApiResponse } from "./client";
 export interface Registration {
   id: string;
   status: "pending" | "confirmed" | "cancelled" | "attended";
-  payment_status?:
-    | "not_required"
-    | "pending"
-    | "completed"
-    | "failed"
-    | "refunded";
+  payment_status?: null | "pending" | "completed" | "failed" | "refunded";
   email: string;
   name: string;
   responses?: Record<string, any>; // Changed from form_data to responses

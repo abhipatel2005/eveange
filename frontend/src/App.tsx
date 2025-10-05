@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import Layout from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/authStore";
+import "./utils/authCleanup"; // Import to run cleanup on app startup
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -22,6 +23,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import EventsPage from "./pages/EventsPage";
 import QRScannerPage from "./pages/QRScannerPage";
 import PaymentPage from "./pages/PaymentPage";
+import EmailVerificationPage from "./pages/EmailVerificationPage";
 
 function App() {
   const validateToken = useAuthStore((state) => state.validateToken);
@@ -36,6 +38,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<EmailVerificationPage />} />
         <Route path="/events" element={<EventsPage />} />
 
         {/* Protected routes */}
@@ -50,7 +53,7 @@ function App() {
         <Route
           path="/events/create"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute>
               <CreateEventPage />
             </ProtectedRoute>
           }
