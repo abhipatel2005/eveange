@@ -43,17 +43,17 @@ const CreateEventPage: React.FC = () => {
   >(undefined);
 
   // Debug logging
-  console.log("CreateEventPage Debug:", {
-    user: user?.email,
-    userRole: user?.role,
-    isOrganizer,
-    showUpgradeModal,
-  });
+  // console.log("CreateEventPage Debug:", {
+  //   user: user?.email,
+  //   userRole: user?.role,
+  //   isOrganizer,
+  //   showUpgradeModal,
+  // });
 
   // Check if user needs to upgrade when component mounts
   useEffect(() => {
     if (user && user.role === "participant") {
-      console.log("Participant detected on page load, showing upgrade modal");
+      // console.log("Participant detected on page load, showing upgrade modal");
       setShowUpgradeModal(true);
     }
   }, [user]);

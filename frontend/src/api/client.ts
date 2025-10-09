@@ -50,25 +50,34 @@ export class ApiClient {
       (config.headers as Record<string, string>)[
         "Authorization"
       ] = `Bearer ${token}`;
-      console.log("🔐 Request with token for:", endpoint);
-    } else {
+      if (import.meta.env.DEV) {
+        console.log("🔐 Request with token for:", endpoint);
+      }
+    } else if (import.meta.env.DEV) {
       console.log("⚠️ No token found for request:", endpoint);
     }
 
     try {
-      console.log("📤 Making request to:", url);
-      console.log("📤 Headers:", config.headers);
+      if (import.meta.env.DEV) {
+        console.log("📤 Making request to:", url);
+        // NEVER log headers as they contain sensitive Authorization tokens
+        console.log("📤 Request method:", config.method);
+      }
       const response = await fetch(url, config);
       const data = await response.json();
 
       if (!response.ok) {
-        console.log("❌ Request failed:", response.status, data);
+        if (import.meta.env.DEV) {
+          console.log("❌ Request failed:");
+        }
 
         // Handle token expiration
         if (response.status === 401 && data.code === "TOKEN_EXPIRED") {
-          console.log(
-            "🔓 Token expired, clearing auth and redirecting to login"
-          );
+          if (import.meta.env.DEV) {
+            console.log(
+              "🔓 Token expired, clearing auth and redirecting to login"
+            );
+          }
           this.handleTokenExpiration();
           throw new ApiError(response.status, {
             ...data,
@@ -79,7 +88,9 @@ export class ApiClient {
         throw new ApiError(response.status, data);
       }
 
-      console.log("✅ Request successful:", data);
+      if (import.meta.env.DEV) {
+        console.log("✅ Request successful:");
+      }
       return data;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -99,7 +110,9 @@ export class ApiClient {
       // First try to get token from store state
       const authState = useAuthStore.getState();
       if (authState.accessToken) {
-        console.log("Retrieved token from store state: Token exists");
+        // if (import.meta.env.DEV) {
+        //   console.log("Retrieved token from store state: Token exists");
+        // }
         return authState.accessToken;
       }
 
@@ -109,22 +122,23 @@ export class ApiClient {
         const parsed = JSON.parse(authStore);
         // Zustand persist stores the data directly in the parsed object
         const token = parsed.state?.accessToken || parsed.accessToken || null;
-        console.log(
-          "Retrieved token from localStorage:",
-          token ? "Token exists" : "No token found"
-        );
+        // if (import.meta.env.DEV) {
+        //   console.log(
+        //     "Retrieved token from localStorage:",
+        //     token ? "Token exists" : "No token found"
+        //   );
+        // }
         return token;
       }
     } catch (error) {
-      console.error("Error retrieving token:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error retrieving token:", error);
+      }
     }
-    console.log("No token found in store or localStorage");
     return null;
   }
 
   private handleTokenExpiration(): void {
-    console.log("🔓 Handling token expiration");
-
     // Clear auth from store
     const authStore = useAuthStore.getState();
     authStore.clearAuth();

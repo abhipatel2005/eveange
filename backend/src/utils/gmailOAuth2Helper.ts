@@ -92,19 +92,21 @@ class GmailOAuth2Helper {
       // Exchange code for tokens
       const tokens = await this.getTokens(authCode);
 
-      console.log("\n✅ Success! Here are your OAuth2 credentials:");
-      console.log("\n📝 Add these to your .env file:");
-      console.log(`GMAIL_USER=your.email@gmail.com`);
-      console.log(`GMAIL_CLIENT_ID=${clientId}`);
-      console.log(`GMAIL_CLIENT_SECRET=${clientSecret}`);
-      console.log(`GMAIL_REFRESH_TOKEN=${tokens.refresh_token}`);
-      console.log(`FROM_EMAIL=your.email@gmail.com`);
+      if (process.env.NODE_ENV === "development") {
+        console.log("\n✅ Success! Here are your OAuth2 credentials:");
+        console.log("\n📝 Add these to your .env file:");
+        console.log(`GMAIL_USER=your.email@gmail.com`);
+        console.log(`GMAIL_CLIENT_ID=[CLIENT_ID_REDACTED]`);
+        console.log(`GMAIL_CLIENT_SECRET=[CLIENT_SECRET_REDACTED]`);
+        console.log(`GMAIL_REFRESH_TOKEN=[REFRESH_TOKEN_REDACTED]`);
+        console.log(`FROM_EMAIL=your.email@gmail.com`);
 
-      if (tokens.access_token) {
-        console.log(`\n🔑 Access Token (optional): ${tokens.access_token}`);
+        if (tokens.access_token) {
+          console.log(`\n🔑 Access Token (optional): [ACCESS_TOKEN_REDACTED]`);
+        }
+
+        console.log("\n🎉 Gmail OAuth2 setup complete!");
       }
-
-      console.log("\n🎉 Gmail OAuth2 setup complete!");
     } catch (error) {
       console.error("❌ Error during token exchange:", error);
     }

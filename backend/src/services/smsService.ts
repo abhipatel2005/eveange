@@ -75,11 +75,13 @@ class SMSService {
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5-minute expiry
 
-      console.log("🔄 Generating phone verification...");
-      console.log("🔍 User ID:", userId);
-      console.log("🔍 Phone Number:", formattedPhone);
-      console.log("🔍 OTP Code:", otpCode);
-      console.log("🔍 Expires at:", expiresAt.toISOString());
+      if (process.env.NODE_ENV === "development") {
+        console.log("🔄 Generating phone verification...");
+        console.log("🔍 User ID:", userId);
+        console.log("🔍 Phone Number:", "***" + formattedPhone.slice(-4)); // Only show last 4 digits
+        console.log("🔍 OTP Code length:", otpCode.length); // Don't log actual OTP
+        console.log("🔍 Expires at:", expiresAt.toISOString());
+      }
 
       // Store OTP in database
       const { data, error } = await supabaseAdmin

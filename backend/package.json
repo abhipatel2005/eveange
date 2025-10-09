@@ -20,6 +20,7 @@
     "googleapis": "^160.0.0",
     "handlebars": "^4.7.8",
     "helmet": "^7.1.0",
+    "isomorphic-dompurify": "^2.28.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.7",
@@ -31,6 +32,7 @@
     "stripe": "^14.25.0",
     "twilio": "^5.10.2",
     "uuid": "^9.0.1",
+    "validator": "^13.15.15",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
@@ -44,6 +46,7 @@
     "@types/nodemailer": "^6.4.13",
     "@types/qrcode": "^1.5.5",
     "@types/uuid": "^9.0.6",
+    "@types/validator": "^13.15.3",
     "@typescript-eslint/eslint-plugin": "^6.9.0",
     "@typescript-eslint/parser": "^6.9.0",
     "eslint": "^8.52.0",

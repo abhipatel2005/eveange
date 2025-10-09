@@ -28,7 +28,13 @@ const EmailVerificationPage: React.FC = () => {
 
   const verifyEmail = async (verificationToken: string) => {
     try {
-      console.log("🔍 Attempting to verify token:", verificationToken);
+      // CRITICAL: Never log actual tokens in production - security risk!
+      // if (import.meta.env.DEV) {
+      //   console.log(
+      //     "🔍 Attempting to verify token length:",
+      //     verificationToken?.length
+      //   );
+      // }
       const response = await fetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:3001/api"
@@ -41,33 +47,33 @@ const EmailVerificationPage: React.FC = () => {
         }
       );
 
-      console.log("📡 Response status:", response.status);
-      console.log("📡 Response ok:", response.ok);
+      // console.log("📡 Response status:", response.status);
+      // console.log("📡 Response ok:", response.ok);
 
       const data = await response.json();
-      console.log("📋 Response data:", data);
+      // console.log("📋 Response data:", data);
 
       if (data.success) {
-        console.log("✅ Success response received");
+        // console.log("✅ Success response received");
         setStatus("success");
         setMessage(data.message || "Email verified successfully!");
       } else {
-        console.log("❌ Error response received:", data.error);
+        // console.log("❌ Error response received:", data.error);
         // Handle specific error cases
         if (data.error?.includes("already been used")) {
-          console.log("🔄 Setting status to already-verified");
+          // console.log("🔄 Setting status to already-verified");
           setStatus("already-verified");
           setMessage(
             "Your email has been verified! You can now log in to your account."
           );
         } else if (data.error?.includes("expired")) {
-          console.log("⏰ Setting status to error (expired)");
+          // console.log("⏰ Setting status to error (expired)");
           setStatus("error");
           setMessage(
             "This verification link has expired. Please request a new verification email."
           );
         } else {
-          console.log("💥 Setting status to error (general)");
+          // console.log("💥 Setting status to error (general)");
           setStatus("error");
           setMessage(data.error || "Failed to verify email.");
         }

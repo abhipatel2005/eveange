@@ -96,7 +96,7 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         setApiProvider(data.provider || "unknown");
         setSuggestions(data.data.results.slice(0, 5)); // Limit to 5 suggestions
         setShowSuggestions(true);
-        console.log(`Using ${data.provider} API for location search`);
+        // console.log(`Using ${data.provider} API for location search`);
       } else {
         setSuggestions([]);
       }
@@ -127,7 +127,7 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   // Handle location selection
   const handleLocationSelect = (place: MapMyIndiaPlace) => {
-    console.log("handleLocationSelect called with:", place);
+    // console.log("handleLocationSelect called with:", place);
 
     const locationData: LocationData = {
       address: place.formatted_address || place.name,
@@ -136,8 +136,8 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       placeId: place.place_id,
     };
 
-    console.log("Location selected:", locationData);
-    console.log("Setting searchQuery to:", locationData.address);
+    // console.log("Location selected:", locationData);
+    // console.log("Setting searchQuery to:", locationData.address);
 
     // Update the search query to show the selected address in the input field
     setSearchQuery(locationData.address);
@@ -151,11 +151,11 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
     setError(null); // Clear any errors
 
-    console.log("Calling onChange with:", locationData);
+    // console.log("Calling onChange with:", locationData);
     // Notify parent component of the selection
     onChange(locationData);
 
-    console.log("handleLocationSelect completed");
+    // console.log("handleLocationSelect completed");
   };
 
   // Clear selection

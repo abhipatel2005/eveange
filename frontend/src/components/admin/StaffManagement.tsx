@@ -78,10 +78,12 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("📋 Staff data received:", data);
-        console.log("📋 Staff array:", data.staff);
-        console.log("📋 Staff length:", data.staff?.length);
-        console.log("📋 Is array?", Array.isArray(data.staff));
+        // if (import.meta.env.DEV) {
+        //   console.log("📋 Staff data received:", data);
+        //   console.log("📋 Staff array:", data.staff);
+        //   console.log("📋 Staff length:", data.staff?.length);
+        //   console.log("📋 Is array?", Array.isArray(data.staff));
+        // }
         setStaff(Array.isArray(data.staff) ? data.staff : []);
       } else {
         console.error("Failed to fetch staff:", response.status);
@@ -158,8 +160,6 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
   const addStaff = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log("📝 Frontend newStaff state:", newStaff);
-
     try {
       // Convert permissions object to array format for backend
       const permissionsArray = [];
@@ -175,8 +175,6 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
         name: newStaff.name,
         permissions: permissionsArray,
       };
-
-      console.log("📤 Sending staff data:", staffData);
 
       const response = await fetch(`/api/checkin/events/${eventId}/staff`, {
         method: "POST",

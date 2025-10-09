@@ -150,14 +150,14 @@ const DashboardPage: React.FC = () => {
   // Authentication state validation (production safe)
   useEffect(() => {
     // Only log authentication state in development
-    if (import.meta.env.DEV) {
-      console.log("Dashboard Auth Debug:", {
-        userExists: !!user,
-        userRole: user?.role,
-        hasToken: !!accessToken,
-        isAuthenticated,
-      });
-    }
+    // if (import.meta.env.DEV) {
+    //   console.log("Dashboard Auth Debug:", {
+    //     userExists: !!user,
+    //     userRole: user?.role,
+    //     hasToken: !!accessToken,
+    //     isAuthenticated,
+    //   });
+    // }
   }, [user, accessToken, isAuthenticated]);
 
   const isOrganizer = user?.role === "organizer" || user?.role === "admin";

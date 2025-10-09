@@ -131,20 +131,21 @@ export class RegistrationController {
             }
             // For paid events, create registration with pending payment status
             const registrationStatus = event.is_paid ? "pending" : "confirmed";
-            const paymentStatus = event.is_paid ? "pending" : "not_required";
+            // Use null for free events since "not_required" is not a valid enum value
+            const paymentStatus = event.is_paid ? "pending" : null;
             // Create registration first to get the ID
             const { data: registration, error: registrationError } = await supabase
                 .from("registrations")
                 .insert({
-                    event_id: eventId,
-                    user_id: userId || null,
-                    email: userEmail,
-                    name: userName,
-                    responses: validatedData.formData,
-                    status: registrationStatus,
-                    payment_status: paymentStatus,
-                    qr_code: "", // We'll update this after getting the ID
-                })
+                event_id: eventId,
+                user_id: userId || null,
+                email: userEmail,
+                name: userName,
+                responses: validatedData.formData,
+                status: registrationStatus,
+                payment_status: paymentStatus,
+                qr_code: "", // We'll update this after getting the ID
+            })
                 .select(`
           id, status, payment_status, created_at, responses, qr_code, email, name,
           event:event_id(id, title, start_date, location, is_paid, price),
@@ -196,7 +197,6 @@ export class RegistrationController {
                     // Prepare email template data
                     const eventDate = new Date(event.start_date).toLocaleDateString();
                     const eventTime = new Date(event.start_date).toLocaleTimeString();
-                    // const ticketUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/ticket/${registration.id}`;
                     const ticketUrl = `https://eventbase.abhipatel.site/ticket/${registration.id}`;
                     const emailData = {
                         participantName: registration.name || "Participant",
@@ -423,9 +423,9 @@ export class RegistrationController {
             const { error: updateError } = await supabase
                 .from("registrations")
                 .update({
-                    status: "cancelled",
-                    updated_at: new Date().toISOString(),
-                })
+                status: "cancelled",
+                updated_at: new Date().toISOString(),
+            })
                 .eq("id", registrationId);
             if (updateError) {
                 console.error("Cancel registration error:", updateError);

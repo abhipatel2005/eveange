@@ -5,6 +5,9 @@ import { Toaster } from "react-hot-toast";
 import App from "./App.tsx";
 import "./index.css";
 
+// Initialize safe logging to prevent sensitive data exposure in production
+import "./utils/safeLogging";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>

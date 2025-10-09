@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
 import { google } from "googleapis";
-import { sendEmailViaGmailAPI } from "./gmailApiService";
+import { sendEmailViaGmailAPI } from "./gmailApiService.js";
 import crypto from "crypto";
-import { supabaseAdmin } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase.js";
 import dotenv from "dotenv";
 dotenv.config();
 // OAuth2 setup for Gmail
@@ -10,7 +10,10 @@ const OAuth2 = google.auth.OAuth2;
 // Create transporter using user's Gmail access token
 async function createUserDelegatedTransporter(userEmail, accessToken, refreshToken) {
     try {
-        console.log("🔑 Setting up user-delegated OAuth2 transporter for:", userEmail);
+        if (process.env.NODE_ENV === "development") {
+            console.log("🔑 Setting up user-delegated OAuth2 transporter for:", userEmail.slice(-10) // Only show last part of email
+            );
+        }
         // Create OAuth2 client for token refresh
         const oauth2Client = new OAuth2(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, `${process.env.BACKEND_URL || "http://localhost:3001"}/api/email/callback`);
         // Verify and refresh token if needed
@@ -25,11 +28,15 @@ async function createUserDelegatedTransporter(userEmail, accessToken, refreshTok
                 const { credentials } = await oauth2Client.refreshAccessToken();
                 if (credentials.access_token) {
                     validAccessToken = credentials.access_token;
-                    console.log("✅ Access token refreshed successfully");
+                    if (process.env.NODE_ENV === "development") {
+                        console.log("✅ Access token refreshed successfully");
+                    }
                     // Update refresh token if a new one was provided
                     if (credentials.refresh_token) {
                         validRefreshToken = credentials.refresh_token;
-                        console.log("✅ Refresh token also updated");
+                        if (process.env.NODE_ENV === "development") {
+                            console.log("✅ Refresh token also updated");
+                        }
                     }
                 }
             }
@@ -53,7 +60,9 @@ async function createUserDelegatedTransporter(userEmail, accessToken, refreshTok
             // If token is invalid and we have refresh token, try to refresh
             if (refreshToken &&
                 (apiError.code === 401 || apiError.message?.includes("invalid"))) {
-                console.log("🔄 Attempting to refresh expired token...");
+                if (process.env.NODE_ENV === "development") {
+                    console.log("🔄 Attempting to refresh expired token...");
+                }
                 try {
                     oauth2Client.setCredentials({
                         refresh_token: refreshToken,
@@ -61,7 +70,9 @@ async function createUserDelegatedTransporter(userEmail, accessToken, refreshTok
                     const { credentials } = await oauth2Client.refreshAccessToken();
                     if (credentials.access_token) {
                         validAccessToken = credentials.access_token;
-                        console.log("✅ Token refreshed successfully after API failure");
+                        if (process.env.NODE_ENV === "development") {
+                            console.log("✅ Token refreshed successfully after API failure");
+                        }
                     }
                 }
                 catch (refreshError) {
@@ -83,7 +94,9 @@ async function createUserDelegatedTransporter(userEmail, accessToken, refreshTok
         // Add refresh token if available for automatic token refresh
         if (validRefreshToken) {
             authConfig.refreshToken = validRefreshToken;
-            console.log("🔄 Refresh token provided for automatic refresh");
+            if (process.env.NODE_ENV === "development") {
+                console.log("🔄 Refresh token provided for automatic refresh");
+            }
         }
         // Create transporter with user's tokens - use explicit SMTP config instead of service
         const transporter = nodemailer.createTransport({
@@ -118,7 +131,9 @@ async function createOAuth2Transporter() {
         if (!accessToken) {
             throw new Error("Failed to create access token");
         }
-        console.log("✅ System OAuth2 access token generated successfully");
+        if (process.env.NODE_ENV === "development") {
+            console.log("✅ System OAuth2 access token generated successfully");
+        }
         // Create transporter with fresh access token
         const transporter = nodemailer.createTransport({
             host: "smtp.gmail.com",
@@ -148,9 +163,11 @@ async function getTransporter(userEmail, userAccessToken, userRefreshToken) {
     // If user credentials are provided, try user-delegated sending first
     if (userEmail && userAccessToken) {
         try {
-            console.log("📧 Using user-delegated email sending for:", userEmail);
-            console.log("🔑 Access token length:", userAccessToken.length);
-            console.log("🔄 Has refresh token:", !!userRefreshToken);
+            if (process.env.NODE_ENV === "development") {
+                console.log("📧 Using user-delegated email sending for:", userEmail.slice(-10));
+                console.log("🔑 Access token length:", userAccessToken.length);
+                console.log("🔄 Has refresh token:", !!userRefreshToken);
+            }
             return await createUserDelegatedTransporter(userEmail, userAccessToken, userRefreshToken);
         }
         catch (error) {
@@ -456,11 +473,13 @@ export class EmailService {
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24); // Token expires in 24 hours
-        console.log("🔄 Generating verification token...");
-        console.log("🔍 User ID:", userId);
-        console.log("🔍 Generated token:", token);
-        console.log("🔍 Token length:", token.length);
-        console.log("🔍 Expires at:", expiresAt.toISOString());
+        // CRITICAL: Never log actual tokens in production - security risk!
+        if (process.env.NODE_ENV === "development") {
+            console.log("🔄 Generating verification token...");
+            console.log("🔍 User ID:", userId);
+            console.log("🔍 Token length:", token.length);
+            console.log("🔍 Expires at:", expiresAt.toISOString());
+        }
         // Store verification token in database
         const { data: insertedData, error } = await supabaseAdmin
             .from("email_verifications")
@@ -479,7 +498,11 @@ export class EmailService {
             console.error("❌ Please run the setup SQL script in your Supabase dashboard.");
             throw new Error(`Failed to generate verification token: ${error.message}`);
         }
-        console.log("✅ Token saved to database:", insertedData);
+        if (process.env.NODE_ENV === "development") {
+            if (process.env.NODE_ENV === "development") {
+                console.log("✅ Token saved to database:", insertedData);
+            }
+        }
         return token;
     }
     /**
@@ -535,7 +558,10 @@ export class EmailService {
       </html>
     `;
         try {
-            console.log("token that comes here:", token);
+            // CRITICAL: Never log actual tokens in production - security risk!
+            if (process.env.NODE_ENV === "development") {
+                console.log("token verification - token length:", token.length);
+            }
             console.log("📧 Starting email sending process...");
             console.log("📧 Gmail User:", process.env.GMAIL_USER);
             console.log("📧 Gmail App Password configured:", !!process.env.GMAIL_APP_PASSWORD);
@@ -600,8 +626,12 @@ export class EmailService {
      */
     static async verifyEmailToken(token) {
         try {
-            console.log("🔍 Searching for token:", token);
-            console.log("🔍 Token length:", token.length);
+            // CRITICAL: Never log actual tokens in production - security risk!
+            if (process.env.NODE_ENV === "development") {
+                if (process.env.NODE_ENV === "development") {
+                    console.log("🔍 Searching for token length:", token.length);
+                }
+            }
             // First, let's see all tokens in the database for debugging
             const { data: allTokens, error: debugError } = await supabaseAdmin
                 .from("email_verifications")
@@ -611,8 +641,10 @@ export class EmailService {
                 console.error("❌ Debug query error:", debugError);
             }
             else {
-                console.log("🔍 All tokens in database:", allTokens);
-                console.log("🔍 Total tokens found:", allTokens?.length || 0);
+                if (process.env.NODE_ENV === "development") {
+                    console.log("🔍 All tokens in database:", allTokens);
+                    console.log("🔍 Total tokens found:", allTokens?.length || 0);
+                }
             }
             // Find verification record
             const { data: verification, error: fetchError } = await supabaseAdmin
@@ -630,7 +662,9 @@ export class EmailService {
             }
             // Check if any verification record was found
             if (!verification || verification.length === 0) {
-                console.log("❌ No verification record found for token");
+                if (process.env.NODE_ENV === "development") {
+                    console.log("❌ No verification record found for token");
+                }
                 return {
                     success: false,
                     error: "Invalid or expired verification token. The token may have already been used or has expired.",
@@ -640,7 +674,9 @@ export class EmailService {
             console.log("✅ Verification record found:", verificationRecord);
             // Check if token has already been used
             if (verificationRecord.is_used || verificationRecord.verified_at) {
-                console.log("❌ Token has already been used");
+                if (process.env.NODE_ENV === "development") {
+                    console.log("❌ Token has already been used");
+                }
                 return {
                     success: false,
                     error: "This verification link has already been used. Please try logging in.",

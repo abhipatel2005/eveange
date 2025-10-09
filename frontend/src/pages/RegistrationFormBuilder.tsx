@@ -68,7 +68,7 @@ export default function RegistrationFormBuilder() {
   useEffect(() => {
     if (!eventId) return;
 
-    console.log("RegistrationFormBuilder: Loading event ID:", eventId);
+    // console.log("RegistrationFormBuilder: Loading event ID:", eventId);
 
     // Load the specific event data
     loadEvent(eventId);
@@ -79,16 +79,6 @@ export default function RegistrationFormBuilder() {
   }, [eventId]);
 
   // Debug logging
-  useEffect(() => {
-    console.log("RegistrationFormBuilder Debug:", {
-      eventId,
-      event,
-      selectedEvent,
-      eventsCount: events.length,
-      isLoading,
-      eventLoading,
-    });
-  }, [eventId, event, selectedEvent, events.length, isLoading, eventLoading]);
   const handleCreateForm = async () => {
     if (!eventId) return;
 

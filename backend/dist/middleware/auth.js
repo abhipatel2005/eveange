@@ -16,7 +16,9 @@ export const authenticateToken = async (req, res, next) => {
         const cleanToken = token.trim();
         // Basic JWT format validation
         if (!cleanToken.includes(".") || cleanToken.split(".").length !== 3) {
-            console.log("Invalid JWT format:", cleanToken.substring(0, 20) + "...");
+            if (process.env.NODE_ENV === "development") {
+                console.log("Invalid JWT format received");
+            }
             res.status(401).json({
                 success: false,
                 error: "Invalid token format",

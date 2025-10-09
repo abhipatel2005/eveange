@@ -18,7 +18,9 @@ export const AuthErrorHandler: React.FC<AuthErrorHandlerProps> = ({
   useEffect(() => {
     // Check if the error is a token expiration
     if (error?.response?.code === "TOKEN_EXPIRED" || error?.status === 401) {
-      console.log("🔓 Detected authentication error, clearing auth");
+      if (import.meta.env.DEV) {
+        console.log("🔓 Detected authentication error, clearing auth");
+      }
 
       // Clear auth state
       clearAuth();
@@ -79,7 +81,9 @@ export const useApiErrorHandler = () => {
 
     // Handle token expiration
     if (error?.response?.code === "TOKEN_EXPIRED" || error?.status === 401) {
-      console.log("🔓 Token expired, handling authentication error");
+      if (import.meta.env.DEV) {
+        console.log("🔓 Token expired, handling authentication error");
+      }
       clearAuth();
       setError("Your session has expired. Please log in again.");
 

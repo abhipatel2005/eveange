@@ -41,24 +41,24 @@ const EventDetailsPage: React.FC = () => {
     );
 
     // Only log registration details in development
-    if (import.meta.env.DEV) {
-      console.log(`🔍 Checking registration for event ${eventId}:`, {
-        foundRegistration: !!registration,
-        registrationStatus: registration?.status,
-        paymentStatus: registration?.payment_status,
-        isEventPaid: registration?.event?.is_paid,
-        allUserRegistrations: userRegistrations.length,
-      });
-    }
+    // if (import.meta.env.DEV) {
+    //   console.log(`🔍 Checking registration for event ${eventId}:`, {
+    //     foundRegistration: !!registration,
+    //     registrationStatus: registration?.status,
+    //     paymentStatus: registration?.payment_status,
+    //     isEventPaid: registration?.event?.is_paid,
+    //     allUserRegistrations: userRegistrations.length,
+    //   });
+    // }
 
     if (!registration) return false;
 
     // For paid events, payment must be completed
     if (registration.event?.is_paid) {
       const isPaymentCompleted = registration.payment_status === "completed";
-      if (import.meta.env.DEV) {
-        console.log(`💳 Paid event - payment completed: ${isPaymentCompleted}`);
-      }
+      // if (import.meta.env.DEV) {
+      //   console.log(`💳 Paid event - payment completed: ${isPaymentCompleted}`);
+      // }
       return isPaymentCompleted;
     }
 
@@ -67,11 +67,11 @@ const EventDetailsPage: React.FC = () => {
       registration.status === "confirmed" ||
       registration.payment_status === null;
 
-    if (import.meta.env.DEV) {
-      console.log(
-        `🆓 Free event - valid registration: ${isValidFreeRegistration}`
-      );
-    }
+    // if (import.meta.env.DEV) {
+    //   console.log(
+    //     `🆓 Free event - valid registration: ${isValidFreeRegistration}`
+    //   );
+    // }
     return isValidFreeRegistration;
   };
 

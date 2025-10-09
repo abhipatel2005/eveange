@@ -1,10 +1,12 @@
 import { Router, Request, Response } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateToken } from "../middleware/auth.js";
+import { fileUploadRateLimit } from "../middleware/rateLimiting.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import PptxGenJS from "pptxgenjs";
+import crypto from "crypto";
 
 const router = Router();
 
@@ -25,29 +27,38 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique filename: eventId_timestamp_originalname
-    const eventId = req.body.eventId || "template";
+    // Generate cryptographically secure filename to prevent path traversal
+    const eventId =
+      req.body.eventId?.replace(/[^a-zA-Z0-9-_]/g, "") || "template";
     const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    cb(null, `${eventId}_${timestamp}${ext}`);
+    const randomBytes = crypto.randomBytes(8).toString("hex");
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    // Validate extension
+    const allowedExtensions = [".ppt", ".pptx"];
+    if (!allowedExtensions.includes(ext)) {
+      return cb(new Error("Invalid file extension"), "");
+    }
+
+    cb(null, `${eventId}_${timestamp}_${randomBytes}${ext}`);
   },
 });
 
 const fileFilter = (req: any, file: any, cb: any) => {
-  // Only allow PowerPoint files
+  // Enhanced file validation
   const allowedMimes = [
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+    "application/vnd.ms-powerpoint", // .ppt
   ];
 
-  if (
-    allowedMimes.includes(file.mimetype) ||
-    file.originalname.endsWith(".pptx") ||
-    file.originalname.endsWith(".ppt")
-  ) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = [".ppt", ".pptx"];
+
+  // Check both MIME type and extension
+  if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error("Only PowerPoint files (.ppt, .pptx) are allowed"), false);
+    cb(new Error("Only PowerPoint files (.ppt, .pptx) are allowed"));
   }
 };
 
@@ -55,7 +66,9 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 5 * 1024 * 1024, // Reduced to 5MB limit for security
+    files: 1, // Only one file at a time
+    fields: 10, // Limit form fields
   },
 });
 
@@ -281,6 +294,7 @@ router.get(
 // POST /api/templates/upload - Upload PowerPoint template
 router.post(
   "/upload",
+  fileUploadRateLimit,
   authenticateToken,
   upload.single("template"),
   async (req: Request, res: Response) => {

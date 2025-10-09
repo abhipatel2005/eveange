@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { supabase } from "../config/supabase.js";
+import { supabase, supabaseAdmin } from "../config/supabase.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { EmailService } from "../services/emailService.js";
 import { getFreshAccessToken } from "./emailAuth.js";
@@ -17,12 +17,21 @@ const addStaffSchema = z.object({
 router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
     try {
         const eventId = req.params.eventId; // Keep as string (UUID)
-        console.log(eventId);
         const userId = req.user.id;
         console.log("🏁 Adding staff member - START");
         console.log("📝 Request body:", JSON.stringify(req.body, null, 2));
         console.log("🆔 Event ID:", eventId);
         console.log("👤 User ID:", userId);
+        console.log("🔑 Auth headers:", req.headers.authorization?.substring(0, 20) + "...");
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(eventId)) {
+            console.log("❌ Invalid UUID format for eventId:", eventId);
+            return res.status(400).json({
+                error: "Invalid event ID format",
+                details: "Event ID must be a valid UUID",
+            });
+        }
         // Validate request body
         const validationResult = addStaffSchema.safeParse(req.body);
         if (!validationResult.success) {
@@ -84,7 +93,7 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
             console.log("🔨 Creating new user...");
             const tempPassword = crypto.randomBytes(8).toString("hex");
             const hashedPassword = await bcrypt.hash(tempPassword, 10);
-            const { data: newUser, error: userError } = await supabase
+            const { data: newUser, error: userError } = await supabaseAdmin
                 .from("users")
                 .insert({
                 email,
@@ -131,7 +140,7 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
         }
         // Create staff assignment
         // Permissions are already in array format from frontend
-        const { data: assignment, error: assignmentError } = await supabase
+        const { data: assignment, error: assignmentError } = await supabaseAdmin
             .from("staff_assignments")
             .insert({
             staff_id: staffUser.id,
@@ -204,46 +213,58 @@ router.get("/events/:eventId/staff", authenticateToken, async (req, res) => {
             });
         }
         // Fetch staff assignments with user details
-        const { data: staffAssignments, error: staffError } = await supabase
+        const { data: staffAssignments, error: staffError } = await supabaseAdmin
             .from("staff_assignments")
             .select(`
           id,
           permissions,
           created_at,
           assigned_by,
-          staff:users!staff_assignments_staff_id_fkey (
-            id,
-            name,
-            email,
-            last_login_at
-          ),
-          assigned_by:users!staff_assignments_assigned_by_fkey (
-            name,
-            email
-          )
+          staff_id,
+          event_id
         `)
             .eq("event_id", eventId)
             .order("created_at", { ascending: false });
+        console.log("🔍 Staff assignments raw data:", staffAssignments);
         if (staffError) {
             console.error("Error fetching staff:", staffError);
             return res.status(500).json({ error: "Failed to fetch staff" });
         }
-        // Transform the data to match the frontend interface
-        const staff = (staffAssignments || []).map((assignment) => ({
-            id: assignment.id,
-            permissions: {
-                can_check_in: Array.isArray(assignment.permissions)
-                    ? assignment.permissions.includes("check-in")
-                    : assignment.permissions?.can_check_in || false,
-                can_view_stats: Array.isArray(assignment.permissions)
-                    ? assignment.permissions.includes("view-stats")
-                    : assignment.permissions?.can_view_stats || false,
-            },
-            assigned_at: assignment.created_at, // Map created_at to assigned_at for frontend
-            user: assignment.staff,
-            assigned_by_user: assignment.assigned_by,
-        }));
+        // Fetch user details separately for each staff member
+        const staff = [];
+        for (const assignment of staffAssignments || []) {
+            console.log("🔄 Processing assignment:", assignment);
+            // Fetch staff user details
+            const { data: staffUser } = await supabaseAdmin
+                .from("users")
+                .select("id, name, email, last_login_at")
+                .eq("id", assignment.staff_id)
+                .single();
+            // Fetch assigned_by user details
+            const { data: assignedByUser } = await supabaseAdmin
+                .from("users")
+                .select("name, email")
+                .eq("id", assignment.assigned_by)
+                .single();
+            const transformedStaff = {
+                id: assignment.id,
+                permissions: {
+                    can_check_in: Array.isArray(assignment.permissions)
+                        ? assignment.permissions.includes("check-in")
+                        : assignment.permissions?.can_check_in || false,
+                    can_view_stats: Array.isArray(assignment.permissions)
+                        ? assignment.permissions.includes("view-stats")
+                        : assignment.permissions?.can_view_stats || false,
+                },
+                assigned_at: assignment.created_at, // Map created_at to assigned_at for frontend
+                user: staffUser,
+                assigned_by_user: assignedByUser,
+            };
+            console.log("✅ Transformed staff:", transformedStaff);
+            staff.push(transformedStaff);
+        }
         console.log("✅ Staff fetched successfully:", staff.length, "members");
+        console.log("📊 Final staff data:", staff);
         res.json({ success: true, staff });
     }
     catch (error) {
@@ -267,23 +288,28 @@ router.get("/events/:eventId/check-in-stats", authenticateToken, async (req, res
             .eq("id", eventId)
             .single();
         if (eventError || !eventAccess) {
+            console.log("❌ Event not found or error:", eventError);
             return res.status(404).json({ error: "Event not found" });
         }
         const isOrganizer = eventAccess.organizer_id === userId;
+        console.log("👑 Is organizer:", isOrganizer, "organizer_id:", eventAccess.organizer_id, "user_id:", userId);
         let isStaff = false;
         if (!isOrganizer) {
-            // Check if user is staff for this event
-            const { data: staffAccess } = await supabase
+            console.log("🔍 Checking staff access...");
+            // Check if user is staff for this event - remove is_active constraint
+            const { data: staffAccess, error: staffError } = await supabase
                 .from("staff_assignments")
                 .select("id, permissions")
                 .eq("staff_id", userId)
                 .eq("event_id", eventId)
-                .eq("is_active", true)
                 .single();
+            console.log("👷 Staff access result:", { staffAccess, staffError });
             isStaff =
                 !!staffAccess && staffAccess.permissions?.includes("check-in");
+            console.log("👷 Is staff with check-in permission:", isStaff);
         }
         if (!isOrganizer && !isStaff) {
+            console.log("❌ Access denied - user is neither organizer nor staff");
             return res.status(403).json({ error: "Access denied" });
         }
         // Get total registrations
@@ -359,20 +385,26 @@ router.post("/events/:eventId/check-in", authenticateToken, async (req, res) => 
         const userId = req.user.id;
         const { qr_code, location = "Main Entrance", device_info } = req.body;
         console.log("🎫 Processing check-in for event:", eventId, "QR:", qr_code);
+        console.log("👤 User ID:", userId);
+        console.log("🔑 User details:", req.user);
         if (!qr_code) {
+            console.log("❌ No QR code provided");
             return res.status(400).json({ error: "QR code is required" });
         }
+        console.log("🔍 Checking event access...");
         // Check if user has access to this event (either organizer or staff)
         const { data: eventAccess, error: eventError } = await supabase
             .from("events")
             .select("id, organizer_id, title")
             .eq("id", eventId)
-            .eq("is_active", true)
             .single();
+        console.log("🎪 Event access result:", { eventAccess, eventError });
         if (eventError || !eventAccess) {
+            console.log("❌ Event not found or error:", eventError);
             return res.status(404).json({ error: "Event not found" });
         }
         const isOrganizer = eventAccess.organizer_id === userId;
+        console.log("👑 Is organizer:", isOrganizer, "organizer_id:", eventAccess.organizer_id, "user_id:", userId);
         let isStaff = false;
         if (!isOrganizer) {
             // Check if user is staff for this event

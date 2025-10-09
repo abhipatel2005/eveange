@@ -53,7 +53,7 @@ const RegistrationFormPage: React.FC = () => {
             setRegistrationForm(formResponse.data.form);
           }
         } catch (formError) {
-          console.log("No custom form found, will use default form");
+          // No custom form found, will use default form
           // Don't set error here - we'll fall back to default form
         }
 

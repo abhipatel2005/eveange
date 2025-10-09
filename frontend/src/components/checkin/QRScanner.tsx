@@ -68,22 +68,22 @@ export function QRScanner({
 
   // Handle successful QR code detection
   const onScanSuccess = useCallback(
-    async (decodedText: string, decodedResult: Html5QrcodeResult) => {
+    async (decodedText: string, _decodedResult: Html5QrcodeResult) => {
       const currentTime = Date.now();
 
       // Prevent rapid successive scans (minimum 2 seconds between scans)
       if (currentTime - lastScanTime.current < 2000) {
-        if (import.meta.env.DEV) {
-          console.log("Ignoring rapid scan");
-        }
+        // if (import.meta.env.DEV) {
+        //   console.log("Ignoring rapid scan");
+        // }
         return;
       }
 
       // Prevent duplicate scans of the same QR code
       if (decodedText === lastScannedCode || scanning) {
-        if (import.meta.env.DEV) {
-          console.log("Ignoring duplicate scan:", decodedText);
-        }
+        // if (import.meta.env.DEV) {
+        //   console.log("Ignoring duplicate scan:", decodedText);
+        // }
         return;
       }
 
@@ -95,8 +95,8 @@ export function QRScanner({
 
       // Only log QR data in development
       if (import.meta.env.DEV) {
-        console.log("QR Code detected:", decodedText);
-        console.log("Scan result details:", decodedResult);
+        // console.log("QR Code detected:", decodedText);
+        // console.log("Scan result details:", decodedResult);
       }
 
       // Clear any existing debounce timer
@@ -188,9 +188,9 @@ export function QRScanner({
       // Stop the stream immediately - we just needed to check permission
       stream.getTracks().forEach((track) => track.stop());
 
-      if (import.meta.env.DEV) {
-        console.log("Camera permission granted");
-      }
+      // if (import.meta.env.DEV) {
+      //   console.log("Camera permission granted");
+      // }
       return true;
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -204,7 +204,7 @@ export function QRScanner({
   const initializeScanner = useCallback(async () => {
     try {
       if (import.meta.env.DEV) {
-        console.log("Initializing HTML5 QR Code Scanner...");
+        // console.log("Initializing HTML5 QR Code Scanner...");
       }
       setHasPermission(null); // Set loading state
 
@@ -257,9 +257,9 @@ export function QRScanner({
 
       setIsInitialized(true);
       setHasPermission(true);
-      if (import.meta.env.DEV) {
-        console.log("QR Scanner initialized successfully");
-      }
+      // if (import.meta.env.DEV) {
+      //   console.log("QR Scanner initialized successfully");
+      // }
     } catch (error) {
       let errorMessage = "Unknown error";
       if (error instanceof Error) {
