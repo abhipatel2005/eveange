@@ -27,7 +27,9 @@ const EventDetailsPage: React.FC = () => {
         setUserRegistrations(response.data.registrations);
       }
     } catch (err) {
-      console.error("Failed to fetch user registrations:", err);
+      if (import.meta.env.DEV) {
+        console.error("Failed to fetch user registrations:", err);
+      }
     }
   };
 
@@ -38,20 +40,25 @@ const EventDetailsPage: React.FC = () => {
         registration.status !== "cancelled"
     );
 
-    console.log(`🔍 Checking registration for event ${eventId}:`, {
-      foundRegistration: !!registration,
-      registrationStatus: registration?.status,
-      paymentStatus: registration?.payment_status,
-      isEventPaid: registration?.event?.is_paid,
-      allUserRegistrations: userRegistrations.length,
-    });
+    // Only log registration details in development
+    if (import.meta.env.DEV) {
+      console.log(`🔍 Checking registration for event ${eventId}:`, {
+        foundRegistration: !!registration,
+        registrationStatus: registration?.status,
+        paymentStatus: registration?.payment_status,
+        isEventPaid: registration?.event?.is_paid,
+        allUserRegistrations: userRegistrations.length,
+      });
+    }
 
     if (!registration) return false;
 
     // For paid events, payment must be completed
     if (registration.event?.is_paid) {
       const isPaymentCompleted = registration.payment_status === "completed";
-      console.log(`💳 Paid event - payment completed: ${isPaymentCompleted}`);
+      if (import.meta.env.DEV) {
+        console.log(`💳 Paid event - payment completed: ${isPaymentCompleted}`);
+      }
       return isPaymentCompleted;
     }
 
@@ -60,9 +67,11 @@ const EventDetailsPage: React.FC = () => {
       registration.status === "confirmed" ||
       registration.payment_status === null;
 
-    console.log(
-      `🆓 Free event - valid registration: ${isValidFreeRegistration}`
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `🆓 Free event - valid registration: ${isValidFreeRegistration}`
+      );
+    }
     return isValidFreeRegistration;
   };
 
@@ -148,7 +157,9 @@ const EventDetailsPage: React.FC = () => {
             "Unable to connect to the server. Please check your internet connection and try again."
           );
         }
-        console.error("Event details error:", err);
+        if (import.meta.env.DEV) {
+          console.error("Event details error:", err);
+        }
       } finally {
         setLoading(false);
       }
@@ -176,7 +187,9 @@ const EventDetailsPage: React.FC = () => {
         }
       } catch (err) {
         alert("Failed to delete event");
-        console.error("Delete event error:", err);
+        if (import.meta.env.DEV) {
+          console.error("Delete event error:", err);
+        }
       }
     }
   };

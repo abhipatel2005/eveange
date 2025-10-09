@@ -1,14 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Calendar,
-  MapPin,
-  Search,
-  Plus,
-  Eye,
-  Users,
-  Ticket,
-} from "lucide-react";
+import { Calendar, MapPin, Search, Plus, Users, Ticket } from "lucide-react";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
 import { useAuth } from "../hooks/useAuth";
@@ -38,7 +30,9 @@ const EventsPage: React.FC = () => {
         setUserRegistrations(response.data.registrations);
       }
     } catch (err) {
-      console.error("Failed to fetch user registrations:", err);
+      if (import.meta.env.DEV) {
+        console.error("Failed to fetch user registrations:", err);
+      }
     }
   };
 

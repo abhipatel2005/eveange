@@ -25,6 +25,9 @@ export function handleErrorWithLogging(
   context?: string
 ): string {
   const message = handleError(error);
-  console.error(`Error${context ? ` in ${context}` : ""}:`, error);
+  // Only log errors in development
+  if (import.meta.env.DEV) {
+    console.error(`Error${context ? ` in ${context}` : ""}:`, error);
+  }
   return message;
 }

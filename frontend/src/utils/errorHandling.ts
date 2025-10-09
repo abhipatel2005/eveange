@@ -167,7 +167,10 @@ export function handleError(
 
   if (options.showToast) {
     // Could integrate with toast library here
-    console.error("Error:", message);
+    // Only log errors in development
+    if (import.meta.env.DEV) {
+      console.error("Error:", message);
+    }
   }
 
   return message;

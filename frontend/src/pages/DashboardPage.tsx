@@ -57,7 +57,7 @@ const DashboardPage: React.FC = () => {
             response.error?.includes("403") ||
             response.error?.includes("Invalid or expired token")
           ) {
-            console.log("Token expired, redirecting to login");
+            // Token expired, redirect to login (no sensitive logging)
             clearAuth();
             navigate("/login");
             return;
@@ -65,14 +65,16 @@ const DashboardPage: React.FC = () => {
           setError(response.error || "Failed to fetch events");
         }
       } catch (err: any) {
-        console.error("Dashboard events error:", err);
+        // Log errors only in development
+        if (import.meta.env.DEV) {
+          console.error("Dashboard events error:", err);
+        }
 
-        // Handle authentication errors
+        // Handle authentication errors (no sensitive logging)
         if (
           err.message?.includes("Invalid or expired token") ||
           err.status === 403
         ) {
-          console.log("Authentication failed, clearing auth and redirecting");
           clearAuth();
           navigate("/login");
           return;
@@ -107,7 +109,7 @@ const DashboardPage: React.FC = () => {
             response.error?.includes("403") ||
             response.error?.includes("Invalid or expired token")
           ) {
-            console.log("Token expired, redirecting to login");
+            // Token expired, redirect to login (no sensitive logging)
             clearAuth();
             navigate("/login");
             return;
@@ -115,14 +117,16 @@ const DashboardPage: React.FC = () => {
           setError(response.error || "Failed to fetch registrations");
         }
       } catch (err: any) {
-        console.error("Dashboard registrations error:", err);
+        // Log errors only in development
+        if (import.meta.env.DEV) {
+          console.error("Dashboard registrations error:", err);
+        }
 
-        // Handle authentication errors
+        // Handle authentication errors (no sensitive logging)
         if (
           err.message?.includes("Invalid or expired token") ||
           err.status === 403
         ) {
-          console.log("Authentication failed, clearing auth and redirecting");
           clearAuth();
           navigate("/login");
           return;
@@ -143,17 +147,17 @@ const DashboardPage: React.FC = () => {
     }
   }, [isAuthenticated, accessToken, user, navigate]);
 
-  // Debug authentication state
+  // Authentication state validation (production safe)
   useEffect(() => {
-    console.log("Dashboard Auth Debug:", {
-      user: user?.email,
-      userRole: user?.role,
-      hasToken: !!accessToken,
-      isAuthenticated,
-      tokenPreview: accessToken
-        ? accessToken.substring(0, 20) + "..."
-        : "No token",
-    });
+    // Only log authentication state in development
+    if (import.meta.env.DEV) {
+      console.log("Dashboard Auth Debug:", {
+        userExists: !!user,
+        userRole: user?.role,
+        hasToken: !!accessToken,
+        isAuthenticated,
+      });
+    }
   }, [user, accessToken, isAuthenticated]);
 
   const isOrganizer = user?.role === "organizer" || user?.role === "admin";

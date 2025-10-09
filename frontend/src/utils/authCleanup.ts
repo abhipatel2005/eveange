@@ -7,7 +7,9 @@ export const cleanupAuthTokens = () => {
     if (token) {
       // Check if it's a valid JWT format
       if (!token.includes(".") || token.split(".").length !== 3) {
-        console.log(`Removing invalid token from localStorage: ${key}`);
+        if (import.meta.env.DEV) {
+          console.log(`Removing invalid token from localStorage: ${key}`);
+        }
         localStorage.removeItem(key);
       }
     }
