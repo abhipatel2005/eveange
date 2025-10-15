@@ -18,14 +18,7 @@ export const requestLogger = (req, res, next) => {
     const originalSend = res.send;
     res.send = function (data) {
         const duration = Date.now() - start;
-        logger.info({
-            method: req.method,
-            url: req.url,
-            statusCode: res.statusCode,
-            duration: `${duration}ms`,
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-        });
+        logger.info(`${req.method} ${req.url} ${res.statusCode} ${duration}ms - ${req.ip}`);
         return originalSend.call(this, data);
     };
     next();

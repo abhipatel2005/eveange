@@ -1,4 +1,5 @@
 import { useAuthStore } from "../store/authStore";
+import { apiRateLimiter } from "../utils/debounce";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3001/api";
@@ -34,10 +35,22 @@ export class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
+    const rateLimitKey = `${options.method || "GET"}:${endpoint}`;
 
+    // Check rate limit
+    if (!apiRateLimiter.isAllowed(rateLimitKey)) {
+      const remaining = apiRateLimiter.getRemainingRequests(rateLimitKey);
+      throw new ApiError(429, {
+        success: false,
+        error: `Rate limit exceeded. ${remaining} requests remaining in this minute.`,
+      });
+    }
+
+    const isFormData = options.body instanceof FormData;
     const config: RequestInit = {
       headers: {
-        "Content-Type": "application/json",
+        // Don't set Content-Type for FormData - let browser set it with boundary
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...options.headers,
       },
       credentials: "include", // Include cookies for refresh tokens
@@ -157,10 +170,20 @@ export class ApiClient {
   }
 
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
+    const isFormData = data instanceof FormData;
+    const config: RequestInit = {
       method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    };
+
+    if (isFormData) {
+      // For FormData, let the browser set Content-Type with boundary
+      config.body = data;
+    } else {
+      // For regular data, use JSON
+      config.body = data ? JSON.stringify(data) : undefined;
+    }
+
+    return this.request<T>(endpoint, config);
   }
 
   async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {

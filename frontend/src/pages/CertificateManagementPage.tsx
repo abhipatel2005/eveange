@@ -1,444 +1,1017 @@
-import { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import { useApiErrorHandler } from "../components/AuthErrorHandler";
-import { CertificateService, Certificate } from "../api/certificates";
-import { EventService, Event } from "../api/events";
-import CertificateTemplatesManager from "../components/CertificateTemplatesManager";
+import { Button } from "@/components/ui/Button";
 import {
-  Award,
-  Download,
-  Users,
-  Calendar,
-  Clock,
   AlertCircle,
-  CheckCircle,
-  Loader,
-  ArrowLeft,
-  FileText,
+  Upload,
+  Trash2,
   Settings,
+  CheckCircle,
+  Edit,
 } from "lucide-react";
+import { apiClient } from "@/api/client";
 
-export default function CertificateManagementPage() {
+interface CertificateTemplate {
+  id: string;
+  name: string;
+  type: "canvas" | "powerpoint";
+  file_path?: string;
+  template_data: any;
+  placeholder_mapping: Record<string, string>;
+  extracted_placeholders?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface DataField {
+  key: string;
+  label: string;
+  description: string;
+  category: "participant" | "event" | "registration" | "system";
+  dataType: "text" | "date" | "number" | "email" | "phone";
+  example?: string;
+}
+
+interface Participant {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  organization?: string;
+  registration_date: string;
+  attendance_date?: string;
+  registration_id: string;
+  custom_fields: Record<string, any>;
+}
+
+interface Certificate {
+  id: string;
+  event_id: string;
+  registration_id: string;
+  file_url: string;
+  certificate_url?: string;
+  verification_code: string;
+  issued_by_id: string;
+  created_at: string;
+  email_sent: boolean;
+  email_sent_at?: string;
+  email_sent_by?: string;
+  registrations: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  events: {
+    id: string;
+    title: string;
+  };
+}
+
+const CertificateManagementPage: React.FC = () => {
   const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading } = useAuth();
-  const { handleApiError } = useApiErrorHandler();
 
-  const [event, setEvent] = useState<Event | null>(null);
+  const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
+  const [dataFields, setDataFields] = useState<DataField[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [eventHasEnded, setEventHasEnded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"certificates" | "templates">(
-    "certificates"
+  const [selectedCertificates, setSelectedCertificates] = useState<string[]>(
+    []
   );
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("default");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+    []
+  );
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [showPlaceholderMapping, setShowPlaceholderMapping] = useState(false);
+  const [mappingTemplate, setMappingTemplate] =
+    useState<CertificateTemplate | null>(null);
 
-  const fetchEventAndCertificates = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch event details first
-      const eventResponse = await EventService.getEventById(eventId!);
-      if (!eventResponse.success || !eventResponse.data) {
-        setError("Event not found");
-        return;
-      }
-
-      setEvent(eventResponse.data.event);
-
-      // Check if event has ended
-      const eventEndDate = new Date(eventResponse.data.event.end_date);
-      const now = new Date();
-      const hasEnded = now > eventEndDate;
-
-      setEventHasEnded(hasEnded);
-
-      // Always try to fetch certificates regardless of event status
-      const certResponse = await CertificateService.getEventCertificates(
-        eventId!
-      );
-      if (certResponse.success && certResponse.data) {
-        setCertificates(certResponse.data.certificates);
-      }
-    } catch (err: any) {
-      console.error("Error fetching data:", err);
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId]);
+  // File upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadType, setUploadType] = useState<"canvas" | "powerpoint">(
+    "powerpoint"
+  );
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    if (!eventId) {
-      setError("Event ID is required");
-      setLoading(false);
-      return;
+    loadData();
+  }, [eventId]);
+
+  const showMessage = (type: "success" | "error", text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 5000);
+  };
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [templatesRes, dataFieldsRes, participantsRes, certificatesRes] =
+        await Promise.all([
+          apiClient.get(`/certificates/templates?eventId=${eventId}`),
+          apiClient.get("/certificates/data-fields"),
+          apiClient.get(`/certificates/events/${eventId}/participants`),
+          apiClient.get(`/certificates/events/${eventId}/certificates`),
+        ]);
+
+      const templatesData =
+        (templatesRes.data as any)?.data || templatesRes.data || [];
+      setTemplates(templatesData);
+
+      const dataFieldsData =
+        (dataFieldsRes.data as any)?.data || dataFieldsRes.data || [];
+      setDataFields(dataFieldsData);
+
+      const participantsData =
+        (participantsRes.data as any)?.data || participantsRes.data || [];
+      setParticipants(participantsData);
+
+      const certificatesData =
+        (certificatesRes.data as any)?.data || certificatesRes.data || [];
+      setCertificates(certificatesData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      showMessage("error", "Failed to load certificate data");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    fetchEventAndCertificates();
-  }, [eventId, fetchEventAndCertificates]);
-
-  const handleGenerateCertificates = async () => {
-    if (!eventId) return;
-
-    // Double-check event has ended before making API call
-    if (!eventHasEnded) {
-      setError("Cannot generate certificates until the event has ended.");
+  const handleFileUpload = async () => {
+    if (!uploadFile || !uploadName) {
+      showMessage("error", "Please select a file and provide a template name");
       return;
     }
 
     try {
-      setGenerating(true);
-      setError(null);
-      setSuccess(null);
-
-      const response = await CertificateService.generateCertificates(eventId, {
-        templateId: selectedTemplate,
-      });
-
-      if (response.success && response.data) {
-        setSuccess(
-          `Successfully generated ${response.data.generated} certificate(s) out of ${response.data.total} eligible participants.`
-        );
-
-        if (response.data.errors && response.data.errors.length > 0) {
-          console.warn("Certificate generation errors:", response.data.errors);
-        }
-
-        // Refresh certificates list
-        await fetchEventAndCertificates();
+      setIsUploading(true);
+      const formData = new FormData();
+      formData.append("template", uploadFile);
+      formData.append("name", uploadName);
+      formData.append("type", uploadType);
+      if (eventId) {
+        formData.append("eventId", eventId);
+        console.log("Uploading template for eventId:", eventId);
       } else {
-        setError(response.error || "Failed to generate certificates");
+        console.log("No eventId found!");
       }
-    } catch (err: any) {
-      console.error("Error generating certificates:", err);
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+
+      const response = await apiClient.post(
+        "/certificates/templates",
+        formData
+      );
+
+      const responseData = response.data as any;
+      console.log("Upload response:", responseData);
+      showMessage(
+        "success",
+        responseData?.data?.message || "Template uploaded successfully"
+      );
+
+      // Reset form
+      setUploadFile(null);
+      setUploadName("");
+      setUploadType("powerpoint");
+
+      // Reload templates
+      await loadData();
+
+      // If placeholders were extracted, show mapping interface
+      if (
+        responseData?.data?.placeholders &&
+        responseData.data.placeholders.length > 0
+      ) {
+        setMappingTemplate(responseData.data.template);
+        setShowPlaceholderMapping(true);
+      }
+    } catch (error: any) {
+      console.error("Error uploading template:", error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to upload template"
+      );
     } finally {
-      setGenerating(false);
+      setIsUploading(false);
     }
   };
 
-  const handleDownloadCertificate = (certificateCode: string) => {
-    const downloadUrl = CertificateService.downloadCertificate(certificateCode);
-    window.open(downloadUrl, "_blank");
+  const handlePlaceholderMapping = async (mapping: Record<string, string>) => {
+    if (!mappingTemplate) return;
+
+    try {
+      await apiClient.put(
+        `/certificates/templates/${mappingTemplate.id}/mapping`,
+        {
+          placeholderMapping: mapping,
+        }
+      );
+
+      showMessage("success", "Placeholder mapping updated successfully");
+      setShowPlaceholderMapping(false);
+      setMappingTemplate(null);
+      await loadData();
+    } catch (error: any) {
+      console.error("Error updating mapping:", error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to update mapping"
+      );
+    }
   };
 
-  if (authLoading || loading) {
+  const handleGenerateCertificates = async () => {
+    if (!selectedTemplate) {
+      showMessage("error", "Please select a template");
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const response = await apiClient.post(
+        `/certificates/events/${eventId}/generate`,
+        {
+          templateId: selectedTemplate,
+          participantIds:
+            selectedParticipants.length > 0 ? selectedParticipants : undefined,
+        }
+      );
+
+      const responseData = response.data as any;
+      const summary = responseData?.summary;
+
+      showMessage(
+        "success",
+        `Generated ${summary?.successful || 0} certificates successfully${
+          summary?.failed > 0 ? `, ${summary.failed} failed` : ""
+        }`
+      );
+
+      // Reset selections and reload data to show new certificates
+      setSelectedParticipants([]);
+      await loadData();
+    } catch (error: any) {
+      console.error("Error generating certificates:", error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to generate certificates"
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!confirm("Are you sure you want to delete this template?")) return;
+
+    try {
+      await apiClient.delete(`/certificates/templates/${templateId}`);
+      showMessage("success", "Template deleted successfully");
+      await loadData();
+    } catch (error: any) {
+      console.error("Error deleting template:", error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to delete template"
+      );
+    }
+  };
+
+  const toggleParticipantSelection = (participantId: string) => {
+    setSelectedParticipants((prev) =>
+      prev.includes(participantId)
+        ? prev.filter((id) => id !== participantId)
+        : [...prev, participantId]
+    );
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading certificates...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
-
-  if (!["organizer", "admin"].includes(user.role)) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Access Denied
-          </h1>
-          <p className="text-gray-600">
-            Only event organizers and administrators can manage certificates.
-          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading certificate data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="h-5 w-5 mr-1" />
-          Back
-        </button>
-
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <Award className="h-8 w-8 mr-3 text-blue-600" />
-              Certificate Management
-            </h1>
-            {event && (
-              <p className="text-gray-600 mt-2">
-                Managing certificates for:{" "}
-                <span className="font-semibold">{event.title}</span>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Certificate Management
+          </h1>
+          <Button onClick={() => navigate(-1)} variant="outline">
+            Back to Event
+          </Button>
+        </div>
+
+        {/* Message Display */}
+        {message && (
+          <div
+            className={`p-4 rounded-lg ${
+              message.type === "success"
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : "bg-red-50 border border-red-200 text-red-800"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {message.type === "success" ? (
+                <CheckCircle className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+              {message.text}
+            </div>
+          </div>
+        )}
+
+        {/* Template Upload Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Upload New Template
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Template Name
+              </label>
+              <input
+                type="text"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                placeholder="Enter template name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Template Type
+              </label>
+              <select
+                value={uploadType}
+                onChange={(e) =>
+                  setUploadType(e.target.value as "canvas" | "powerpoint")
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="powerpoint">PowerPoint (.pptx)</option>
+                <option value="canvas">Canvas (Programmatic)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Template File
+              </label>
+              <input
+                type="file"
+                accept=".pptx,.png,.jpg,.jpeg"
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleFileUpload}
+            disabled={isUploading || !uploadFile || !uploadName}
+            className="w-full md:w-auto"
+          >
+            {isUploading ? "Uploading..." : "Upload Template"}
+          </Button>
+        </div>
+
+        {/* Templates List */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Available Templates</h2>
+
+          {templates.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No templates available. Upload a template to get started.
               </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
-          <div className="flex">
-            <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
-            <p className="text-green-700">{success}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab("certificates")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "certificates"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Award className="h-4 w-4 inline-block mr-2" />
-              Certificates
-            </button>
-            <button
-              onClick={() => setActiveTab("templates")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "templates"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Settings className="h-4 w-4 inline-block mr-2" />
-              Templates
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "templates" ? (
-        <CertificateTemplatesManager eventId={eventId!} />
-      ) : (
-        <>
-          {event && (
-            <div className="space-y-6">
-              {/* Event Info */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Event Information
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center">
-                    <Calendar className="h-5 w-5 text-gray-400 mr-2" />
-                    <div>
-                      <p className="text-sm text-gray-500">Event Date</p>
-                      <p className="font-medium">
-                        {new Date(event.start_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                    <div>
-                      <p className="text-sm text-gray-500">Status</p>
-                      <p className="font-medium text-green-600">Event Ended</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Users className="h-5 w-5 text-gray-400 mr-2" />
-                    <div>
-                      <p className="text-sm text-gray-500">Certificates</p>
-                      <p className="font-medium">
-                        {certificates.length} Generated
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Template for Generation
+                </label>
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Choose a template</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name} ({template.type})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Certificate Actions */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    Certificate Generation
-                  </h2>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Placeholders
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {templates.map((template) => {
+                      const placeholderCount =
+                        template.extracted_placeholders?.length || 0;
+                      const mappedCount = Object.values(
+                        template.placeholder_mapping || {}
+                      ).filter(Boolean).length;
+                      const isConfigured =
+                        placeholderCount === 0 ||
+                        placeholderCount === mappedCount;
 
-                <div className="mb-4">
-                  <label
-                    htmlFor="template-select"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Certificate Template
-                  </label>
-                  <select
-                    id="template-select"
-                    value={selectedTemplate}
-                    onChange={(e) => setSelectedTemplate(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="default">Default Template</option>
-                    {/* Template options will be populated by the template manager */}
-                  </select>
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleGenerateCertificates}
-                    disabled={generating || !eventHasEnded}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {generating ? (
-                      <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Award className="h-4 w-4 mr-2" />
-                    )}
-                    {generating
-                      ? "Generating..."
-                      : !eventHasEnded
-                      ? "Event Must End First"
-                      : "Generate Certificates"}
-                  </button>
-                </div>
-
-                {!eventHasEnded && event ? (
-                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                    <div className="flex items-center">
-                      <Clock className="h-5 w-5 text-amber-600 mr-2" />
-                      <div>
-                        <p className="text-amber-800 font-medium">
-                          Event Still in Progress
-                        </p>
-                        <p className="text-amber-700 text-sm mt-1">
-                          Certificates can only be generated after the event
-                          ends on{" "}
-                          <span className="font-medium">
-                            {new Date(event.end_date).toLocaleDateString()} at{" "}
-                            {new Date(event.end_date).toLocaleTimeString()}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                <p className="text-gray-600 text-sm">
-                  Generate certificates for all participants who attended this
-                  event. Only participants who checked in will receive
-                  certificates.
-                </p>
-              </div>
-
-              {/* Certificates List */}
-              <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                    <FileText className="h-5 w-5 mr-2" />
-                    Generated Certificates ({certificates.length})
-                  </h2>
-                </div>
-
-                {certificates.length === 0 ? (
-                  <div className="p-6 text-center">
-                    <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">
-                      No certificates generated yet
-                    </p>
-                    <p className="text-gray-400 text-sm mt-2">
-                      Click "Generate Certificates" to create certificates for
-                      attended participants
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Participant
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Certificate Code
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Issued Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {certificates.map((certificate) => (
-                          <tr key={certificate.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="font-medium text-gray-900">
-                                  {certificate.participant_name}
+                      return (
+                        <tr key={template.id}>
+                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                            {template.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                template.type === "powerpoint"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {template.type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {placeholderCount > 0 ? (
+                              <div className="space-y-1">
+                                <div className="font-medium">
+                                  {mappedCount}/{placeholderCount} mapped
                                 </div>
-                                <div className="text-sm text-gray-500">
-                                  {certificate.participant_email}
-                                </div>
+                                {template.extracted_placeholders?.map(
+                                  (placeholder, idx) => {
+                                    const mappedField =
+                                      template.placeholder_mapping?.[
+                                        placeholder
+                                      ];
+                                    return (
+                                      <div key={idx} className="text-xs">
+                                        <code className="bg-gray-100 px-1 rounded">
+                                          {placeholder}
+                                        </code>
+                                        {mappedField ? (
+                                          <span className="text-green-600 ml-1">
+                                            → {mappedField}
+                                          </span>
+                                        ) : (
+                                          <span className="text-red-500 ml-1">
+                                            → unmapped
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                )}
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                                {certificate.certificate_code}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {new Date(
-                                certificate.issued_at
-                              ).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            ) : (
+                              "None"
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                isConfigured
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {isConfigured ? "Ready" : "Needs Configuration"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="flex gap-2">
+                              {placeholderCount > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setMappingTemplate(template);
+                                    setShowPlaceholderMapping(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title={
+                                    isConfigured
+                                      ? "Edit mapping"
+                                      : "Configure mapping"
+                                  }
+                                >
+                                  {isConfigured ? (
+                                    <Edit className="h-4 w-4" />
+                                  ) : (
+                                    <Settings className="h-4 w-4" />
+                                  )}
+                                </button>
+                              )}
                               <button
                                 onClick={() =>
-                                  handleDownloadCertificate(
-                                    certificate.certificate_code
-                                  )
+                                  handleDeleteTemplate(template.id)
                                 }
-                                className="text-blue-600 hover:text-blue-900 flex items-center"
+                                className="text-red-600 hover:text-red-900"
+                                title="Delete template"
                               >
-                                <Download className="h-4 w-4 mr-1" />
-                                Download
+                                <Trash2 className="h-4 w-4" />
                               </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
-        </>
-      )}
+        </div>
+
+        {/* Generated Certificates */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Generated Certificates ({certificates.length} total)
+          </h2>
+
+          {certificates.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No certificates have been generated yet. Select a template and
+                participants above to generate certificates.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setSelectedCertificates(certificates.map((c) => c.id))
+                  }
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedCertificates([])}
+                >
+                  Clear Selection
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={selectedCertificates.length === 0}
+                  onClick={async () => {
+                    try {
+                      await apiClient.post(
+                        `/certificates/events/${eventId}/email`,
+                        {
+                          certificateIds: selectedCertificates,
+                        }
+                      );
+                      showMessage(
+                        "success",
+                        `Emailed ${selectedCertificates.length} certificates successfully`
+                      );
+                    } catch (error: any) {
+                      console.error("Error emailing certificates:", error);
+                      showMessage("error", "Failed to email certificates");
+                    }
+                  }}
+                >
+                  Email Selected ({selectedCertificates.length})
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedCertificates.length === certificates.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCertificates(
+                                certificates.map((c) => c.id)
+                              );
+                            } else {
+                              setSelectedCertificates([]);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Participant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Verification Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Generated Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {certificates.map((certificate) => (
+                      <tr key={certificate.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedCertificates.includes(
+                              certificate.id
+                            )}
+                            onChange={() => {
+                              setSelectedCertificates((prev) =>
+                                prev.includes(certificate.id)
+                                  ? prev.filter((id) => id !== certificate.id)
+                                  : [...prev, certificate.id]
+                              );
+                            }}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                          {certificate.registrations?.name || "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {certificate.registrations?.email || "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                            {certificate.verification_code}
+                          </code>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(
+                            certificate.created_at
+                          ).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {certificate.email_sent ? (
+                            <div className="flex items-center">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Sent
+                              </span>
+                              {certificate.email_sent_at && (
+                                <span className="ml-2 text-xs text-gray-400">
+                                  {new Date(
+                                    certificate.email_sent_at
+                                  ).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Not Sent
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (certificate.file_url) {
+                                  window.open(certificate.file_url, "_blank");
+                                } else {
+                                  showMessage(
+                                    "error",
+                                    "Certificate file not available"
+                                  );
+                                }
+                              }}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await apiClient.post(
+                                    `/certificates/events/${eventId}/email`,
+                                    {
+                                      certificateIds: [certificate.id],
+                                    }
+                                  );
+                                  showMessage(
+                                    "success",
+                                    "Certificate emailed successfully"
+                                  );
+                                } catch (error: any) {
+                                  console.error(
+                                    "Error emailing certificate:",
+                                    error
+                                  );
+                                  showMessage(
+                                    "error",
+                                    "Failed to email certificate"
+                                  );
+                                }
+                              }}
+                            >
+                              Email
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Participants Selection */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Select Participants ({participants.length} eligible)
+          </h2>
+
+          {participants.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No eligible participants found. Only participants who attended
+                the event can receive certificates.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setSelectedParticipants(participants.map((p) => p.id))
+                  }
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedParticipants([])}
+                >
+                  Clear Selection
+                </Button>
+                <span className="text-sm text-gray-600">
+                  {selectedParticipants.length} of {participants.length}{" "}
+                  selected
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedParticipants.length === participants.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedParticipants(
+                                participants.map((p) => p.id)
+                              );
+                            } else {
+                              setSelectedParticipants([]);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Attendance
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Organization
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {participants.map((participant) => (
+                      <tr key={participant.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedParticipants.includes(
+                              participant.id
+                            )}
+                            onChange={() =>
+                              toggleParticipantSelection(participant.id)
+                            }
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                          {participant.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.attendance_date
+                            ? new Date(
+                                participant.attendance_date
+                              ).toLocaleDateString()
+                            : "Attended"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.organization || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Generate Certificates */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <Button
+            onClick={handleGenerateCertificates}
+            disabled={
+              isGenerating || !selectedTemplate || participants.length === 0
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isGenerating
+              ? "Generating Certificates..."
+              : "Generate Certificates"}
+          </Button>
+        </div>
+
+        {/* Placeholder Mapping Modal */}
+        {showPlaceholderMapping && mappingTemplate && (
+          <PlaceholderMappingModal
+            template={mappingTemplate}
+            dataFields={dataFields}
+            onSave={handlePlaceholderMapping}
+            onClose={() => {
+              setShowPlaceholderMapping(false);
+              setMappingTemplate(null);
+            }}
+          />
+        )}
+      </div>
     </div>
   );
+};
+
+interface PlaceholderMappingModalProps {
+  template: CertificateTemplate;
+  dataFields: DataField[];
+  onSave: (mapping: Record<string, string>) => void;
+  onClose: () => void;
 }
+
+const PlaceholderMappingModal: React.FC<PlaceholderMappingModalProps> = ({
+  template,
+  dataFields,
+  onSave,
+  onClose,
+}) => {
+  const [mapping, setMapping] = useState<Record<string, string>>(
+    template.placeholder_mapping || {}
+  );
+
+  const handleSave = () => {
+    onSave(mapping);
+  };
+
+  const groupedFields = dataFields.reduce((groups, field) => {
+    if (!groups[field.category]) {
+      groups[field.category] = [];
+    }
+    groups[field.category].push(field);
+    return groups;
+  }, {} as Record<string, DataField[]>);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto m-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Configure Placeholder Mapping</h2>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+
+        <p className="text-gray-600 mb-6">
+          Map the placeholders found in your template to data fields from the
+          database.
+        </p>
+
+        <div className="space-y-4">
+          {template.extracted_placeholders?.map((placeholder) => (
+            <div key={placeholder} className="border rounded-lg p-4">
+              <label className="block text-lg font-medium mb-2">
+                Placeholder:{" "}
+                <code className="bg-gray-100 px-2 py-1 rounded">
+                  {"{{" + placeholder + "}}"}
+                </code>
+              </label>
+              <select
+                value={mapping[placeholder] || ""}
+                onChange={(e) =>
+                  setMapping((prev) => ({
+                    ...prev,
+                    [placeholder]: e.target.value,
+                  }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a data field</option>
+                {Object.entries(groupedFields).map(([category, fields]) => (
+                  <optgroup key={category} label={category.toUpperCase()}>
+                    {fields.map((field) => (
+                      <option key={field.key} value={field.key}>
+                        {field.label} - {field.description}
+                        {field.example && ` (e.g., ${field.example})`}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <Button onClick={handleSave} className="flex-1">
+            Save Mapping
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CertificateManagementPage;

@@ -4,6 +4,9 @@ import { sendEmailViaGmailAPI } from "./gmailApiService.js";
 import crypto from "crypto";
 import { supabase, supabaseAdmin } from "../config/supabase.js";
 import dotenv from "dotenv";
+import fs from "fs/promises";
+import path from "path";
+import { azureBlobService } from "../config/azure.js";
 
 dotenv.config();
 
@@ -1045,6 +1048,250 @@ export class EmailService {
       console.error("Resend verification error:", error);
       return { success: false, error: "Failed to resend verification email" };
     }
+  }
+
+  /**
+   * Send certificate email with certificate attachment
+   */
+  static async sendCertificateEmail(
+    participantEmail: string,
+    participantName: string,
+    eventTitle: string,
+    certificateUrl: string,
+    certificateCode: string,
+    verificationCode: string,
+    customMessage?: string,
+    userEmail?: string,
+    userAccessToken?: string,
+    userRefreshToken?: string
+  ): Promise<boolean> {
+    try {
+      // Get certificate attachment from Azure Blob Storage
+      let certificateAttachment = null;
+
+      if (
+        certificateUrl &&
+        (certificateUrl.includes("blob.core.windows.net") ||
+          certificateUrl.includes("sig="))
+      ) {
+        try {
+          console.log(
+            `📎 Downloading certificate from Azure for attachment...`
+          );
+
+          // Extract filename from Azure URL (handle both regular and SAS URLs)
+          const urlParts = certificateUrl.split("/");
+          let fileName = urlParts[urlParts.length - 1];
+
+          // Remove SAS query parameters if present
+          if (fileName.includes("?")) {
+            fileName = fileName.split("?")[0];
+          }
+
+          console.log(`📎 Extracting filename: ${fileName}`);
+
+          // Download certificate from Azure Blob Storage
+          const certificateBuffer = await azureBlobService.downloadCertificate(
+            fileName
+          );
+
+          certificateAttachment = {
+            filename: `certificate-${certificateCode}.pptx`,
+            content: certificateBuffer,
+            contentType:
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          };
+
+          console.log(
+            `✅ Certificate downloaded successfully for email attachment (${certificateBuffer.length} bytes)`
+          );
+        } catch (downloadError) {
+          console.error(
+            "❌ Failed to download certificate for attachment:",
+            downloadError
+          );
+          // Continue without attachment
+        }
+      }
+
+      // First try SMTP approach
+      const transporter = await getTransporter(
+        userEmail,
+        userAccessToken,
+        userRefreshToken
+      );
+
+      const htmlContent = this.generateCertificateEmailTemplate(
+        participantName,
+        eventTitle,
+        certificateCode,
+        verificationCode,
+        customMessage
+      );
+
+      const fromEmail =
+        userEmail || process.env.FROM_EMAIL || "noreply@eventplatform.com";
+
+      const subject = `🎉 Your Certificate for ${eventTitle}`;
+
+      const mailOptions: any = {
+        from: fromEmail,
+        to: participantEmail,
+        subject,
+        html: htmlContent,
+      };
+
+      // Add attachment if available
+      if (certificateAttachment) {
+        mailOptions.attachments = [certificateAttachment];
+      }
+
+      const result = await transporter.sendMail(mailOptions);
+
+      console.log(
+        "📧 Certificate email sent successfully via SMTP, messageId:",
+        result.messageId
+      );
+      console.log("📧 Sent from:", fromEmail, "to:", participantEmail);
+      return true;
+    } catch (smtpError) {
+      console.error("❌ SMTP certificate email failed:", smtpError);
+
+      // Fallback to Gmail API if SMTP fails and credentials are available
+      if (userEmail && userAccessToken) {
+        try {
+          console.log("🔄 Attempting certificate email via Gmail API...");
+
+          const htmlContent = this.generateCertificateEmailTemplate(
+            participantName,
+            eventTitle,
+            certificateCode,
+            verificationCode,
+            customMessage
+          );
+
+          await sendEmailViaGmailAPI(
+            userEmail,
+            userAccessToken,
+            participantEmail,
+            `🎉 Your Certificate for ${eventTitle}`,
+            htmlContent,
+            userRefreshToken || ""
+          );
+
+          console.log("✅ Certificate email sent successfully via Gmail API");
+          return true;
+        } catch (apiError) {
+          console.error(
+            "❌ Gmail API certificate email also failed:",
+            apiError
+          );
+          return false;
+        }
+      } else {
+        console.error("❌ No Gmail API credentials provided for fallback");
+        return false;
+      }
+    }
+  }
+
+  /**
+   * Generate certificate email template
+   */
+  private static generateCertificateEmailTemplate(
+    participantName: string,
+    eventTitle: string,
+    certificateCode: string,
+    verificationCode: string,
+    customMessage?: string
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Certificate - ${eventTitle}</title>
+      </head>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa;">
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 700;">🎉 Congratulations!</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 18px;">Your certificate is ready</p>
+          </div>
+          
+          <!-- Main Content -->
+          <div style="padding: 40px 30px;">
+            <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 24px;">Hello ${participantName},</h2>
+            
+            <p style="color: #5a6c7d; line-height: 1.7; font-size: 16px; margin-bottom: 30px;">
+              ${
+                customMessage ||
+                `Congratulations on successfully completing "${eventTitle}"! We're pleased to present you with your official certificate of completion.`
+              }
+            </p>
+            
+            <!-- Certificate Details Card -->
+            <div style="background: #f8f9fa; border-radius: 10px; padding: 30px; margin-bottom: 30px; border-left: 4px solid #667eea;">
+              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">📜 Certificate Details</h3>
+              
+              <div style="margin-bottom: 15px;">
+                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Event:</div>
+                <span style="color: #2c3e50; font-weight: 500;">${eventTitle}</span>
+              </div>
+              
+              <div style="margin-bottom: 15px;">
+                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Certificate ID:</div>
+                <code style="background: #e9ecef; padding: 6px 10px; border-radius: 4px; color: #495057; font-family: 'Courier New', monospace; font-size: 14px;">${certificateCode}</code>
+              </div>
+              
+              <div style="margin-bottom: 0;">
+                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Verification:</div>
+                <code style="background: #e9ecef; padding: 6px 10px; border-radius: 4px; color: #495057; font-family: 'Courier New', monospace; font-size: 14px;">${verificationCode}</code>
+              </div>
+            </div>
+            
+            <!-- Important Notes -->
+            <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 25px; margin-bottom: 30px;">
+              <h4 style="color: #155724; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📋 Important Information</h4>
+              <ul style="color: #155724; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li>Keep your verification code secure - it proves your certificate's authenticity</li>
+                <li>This certificate is digitally signed and tamper-proof</li>
+                <li>You can verify your certificate using the verification code on our platform</li>
+                <li>For any questions, please contact our support team</li>
+              </ul>
+            </div>
+            
+            <!-- Certificate Download -->
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px;">
+                <p style="color: #856404; margin: 0; font-size: 14px;">
+                  📎 <strong>Certificate Attachment:</strong> Your certificate will be attached to this email You can download them within in the span of 30 days.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Footer -->
+          <div style="background: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef;">
+            <p style="color: #6c757d; margin: 0 0 10px 0; font-size: 14px;">Thank you for participating in our event!</p>
+            <p style="color: #6c757d; margin: 0; font-size: 14px;">
+              Best regards,<br>
+              <strong style="color: #495057;">Event Management Team</strong>
+            </p>
+          </div>
+          
+        </div>
+        
+        <!-- Footer Note -->
+        <div style="text-align: center; padding: 20px; color: #adb5bd; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </body>
+      </html>
+    `;
   }
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Calendar, MapPin, Search, Plus, Users, Ticket } from "lucide-react";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 
 const EventsPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [userRegistrations, setUserRegistrations] = useState<Registration[]>(
     []
@@ -17,9 +18,6 @@ const EventsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showUpcomingOnly, setShowUpcomingOnly] = useState(true);
-  const [registering, setRegistering] = useState<{ [key: string]: boolean }>(
-    {}
-  );
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -70,28 +68,11 @@ const EventsPage: React.FC = () => {
     fetchEvents();
   };
 
-  const handleQuickRegister = async (eventId: string) => {
+  const handleRegisterClick = (eventId: string) => {
     if (!user) return;
 
-    setRegistering((prev) => ({ ...prev, [eventId]: true }));
-
-    try {
-      const response = await RegistrationService.registerForEvent(eventId, {
-        formData: {}, // Empty form data for quick registration
-      });
-
-      if (response.success) {
-        // Refresh data
-        fetchEvents();
-        fetchUserRegistrations();
-      } else {
-        setError("Failed to register for event");
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to register for event");
-    } finally {
-      setRegistering((prev) => ({ ...prev, [eventId]: false }));
-    }
+    // Navigate to the registration form page
+    navigate(`/events/${eventId}/register`);
   };
 
   const isUserRegistered = (eventId: string) => {
@@ -448,18 +429,10 @@ const EventsPage: React.FC = () => {
                           </button>
                         ) : user ? (
                           <button
-                            onClick={() => handleQuickRegister(event.id)}
-                            disabled={registering[event.id]}
-                            className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => handleRegisterClick(event.id)}
+                            className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                           >
-                            {registering[event.id] ? (
-                              <div className="flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Registering...
-                              </div>
-                            ) : (
-                              "Register Now"
-                            )}
+                            Register Now
                           </button>
                         ) : (
                           <Link

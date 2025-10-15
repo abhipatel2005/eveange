@@ -40,6 +40,24 @@ export interface CertificateGeneration {
 }
 
 export class CertificateService {
+  // Get all past events for certificate generation
+  static async getPastEvents(): Promise<
+    ApiResponse<
+      Array<{
+        id: string;
+        title: string;
+        description: string;
+        start_date: string;
+        end_date: string;
+        location: string;
+        status: string;
+        registrations_count: number;
+      }>
+    >
+  > {
+    return apiClient.get("/certificates/events");
+  }
+
   // Get all certificates for an event (organizer only)
   static async getEventCertificates(eventId: string): Promise<
     ApiResponse<{
@@ -58,10 +76,45 @@ export class CertificateService {
       templateId?: string;
     }
   ): Promise<ApiResponse<CertificateGeneration>> {
-    return apiClient.post("/certificates/generate", {
-      eventId,
+    return apiClient.post(`/certificates/events/${eventId}/generate`, {
       participantIds: options?.participantIds,
       templateId: options?.templateId,
+    });
+  }
+
+  // Get all certificates for an event
+  static async getCertificates(
+    eventId: string
+  ): Promise<ApiResponse<Certificate[]>> {
+    return apiClient.get(`/certificates/events/${eventId}/certificates`);
+  }
+
+  // Email certificates to participants
+  static async emailCertificates(
+    eventId: string,
+    options?: {
+      certificateIds?: string[];
+      message?: string;
+    }
+  ): Promise<
+    ApiResponse<{
+      results: Array<{
+        certificateId: string;
+        participantName: string;
+        participantEmail: string;
+        status: "sent" | "failed";
+        error?: string;
+      }>;
+      summary: {
+        total: number;
+        sent: number;
+        failed: number;
+      };
+    }>
+  > {
+    return apiClient.post(`/certificates/events/${eventId}/email`, {
+      certificateIds: options?.certificateIds,
+      message: options?.message,
     });
   }
 

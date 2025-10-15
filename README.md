@@ -9,7 +9,9 @@ A comprehensive, modern event management platform with React TypeScript frontend
 - **Event Creation & Management**: Full-featured event creation with rich forms
 - **User Registration & Authentication**: Secure user accounts with role-based access
 - **QR Code Generation & Scanning**: Automated attendance tracking
-- **Digital Certificate Generation**: Automatic certificate creation and distribution
+- **Digital Certificate Generation**: Professional PowerPoint certificates with Azure Blob Storage
+- **Cloud Storage Integration**: Azure Blob Storage for scalable certificate management
+- **Email Distribution**: Automatic certificate delivery with email attachments
 - **Payment Integration**: Stripe payment processing for paid events
 - **Analytics Dashboard**: Comprehensive event analytics and insights
 
@@ -72,10 +74,17 @@ A comprehensive, modern event management platform with React TypeScript frontend
    DATABASE_URL=your_postgresql_url
    JWT_SECRET=your_jwt_secret
    STRIPE_SECRET_KEY=your_stripe_secret_key
+
+   # Email Configuration
    SMTP_HOST=your_smtp_host
    SMTP_PORT=587
    SMTP_USER=your_email
    SMTP_PASS=your_password
+
+   # Azure Blob Storage (for certificates)
+   AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
+   AZURE_STORAGE_ACCOUNT_NAME=your_storage_account
+   AZURE_CONTAINER_NAME=certificates
    ```
 
 4. **Setup database**
@@ -85,7 +94,18 @@ A comprehensive, modern event management platform with React TypeScript frontend
    npm run db:migrate
    ```
 
-5. **Start development servers**
+5. **Setup Azure Blob Storage (Optional - for certificate storage)**
+
+   See [Azure Setup Guide](./docs/AZURE_BLOB_STORAGE_SETUP.md) for detailed instructions.
+
+   Quick test:
+
+   ```bash
+   cd backend
+   npx tsx test-azure.ts
+   ```
+
+6. **Start development servers**
    ```bash
    npm run dev
    ```

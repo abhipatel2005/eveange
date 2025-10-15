@@ -255,13 +255,12 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
     }
 
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/checkin/events/${eventId}/staff/${staffId}`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         }
       );

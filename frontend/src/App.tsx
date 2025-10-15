@@ -16,6 +16,7 @@ import MyRegistrationsPage from "./pages/MyRegistrationsPage";
 import EventRegistrationsPage from "./pages/EventRegistrationsPage";
 import AttendancePage from "./pages/AttendancePage";
 import CertificateManagementPage from "./pages/CertificateManagementPage";
+import CertificatesListPage from "./pages/CertificatesListPage";
 import CertificateVerificationPage from "./pages/CertificateVerificationPage";
 import CheckInPage from "./pages/CheckInPage";
 import ParticipantTicketPage from "./pages/ParticipantTicketPage";
@@ -87,6 +88,22 @@ function App() {
           element={
             <ProtectedRoute requireOrganizer>
               <AttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/certificates"
+          element={
+            <ProtectedRoute requireOrganizer>
+              <CertificatesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/certificates/:id"
+          element={
+            <ProtectedRoute requireOrganizer>
+              <CertificateManagementPage />
             </ProtectedRoute>
           }
         />

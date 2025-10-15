@@ -7,14 +7,21 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
+import { useAuthStore } from "../store/authStore";
 
 // Import the API client
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
+// Helper function to get current token
+const getCurrentToken = () => {
+  const authState = useAuthStore.getState();
+  return authState.accessToken;
+};
+
 const api = {
   get: async (endpoint: string) => {
-    const token = localStorage.getItem("token");
+    const token = getCurrentToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -24,7 +31,7 @@ const api = {
     return { data: await response.json() };
   },
   post: async (endpoint: string, data?: any) => {
-    const token = localStorage.getItem("token");
+    const token = getCurrentToken();
     const headers: any = {
       Authorization: `Bearer ${token}`,
     };
@@ -41,7 +48,7 @@ const api = {
     return { data: await response.json() };
   },
   put: async (endpoint: string, data: any) => {
-    const token = localStorage.getItem("token");
+    const token = getCurrentToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: "PUT",
       headers: {
@@ -53,7 +60,7 @@ const api = {
     return { data: await response.json() };
   },
   delete: async (endpoint: string) => {
-    const token = localStorage.getItem("token");
+    const token = getCurrentToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: "DELETE",
       headers: {
@@ -245,9 +252,11 @@ const CertificateTemplates: React.FC<CertificateTemplatesProps> = ({
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/templates/event/${eventId}`);
+      const response = await api.get(
+        `/certificates/templates?eventId=${eventId}`
+      );
       if (response.data.success) {
-        setTemplates(response.data.data.templates);
+        setTemplates(response.data.data || []);
       }
     } catch (error: any) {
       setError(error.response?.data?.error || "Failed to load templates");
@@ -258,7 +267,7 @@ const CertificateTemplates: React.FC<CertificateTemplatesProps> = ({
 
   const loadDataFields = async () => {
     try {
-      const response = await api.get("/templates/data-fields");
+      const response = await api.get("/certificates/data-fields");
       if (response.data.success) {
         setDataFields(response.data.data);
       }
@@ -300,9 +309,19 @@ const CertificateTemplates: React.FC<CertificateTemplatesProps> = ({
       const formData = new FormData();
       formData.append("template", selectedFile);
       formData.append("eventId", eventId);
-      formData.append("templateName", templateName.trim());
+      formData.append("name", templateName.trim());
+      formData.append(
+        "type",
+        selectedFile.type.includes("powerpoint") ||
+          selectedFile.name.endsWith(".pptx")
+          ? "powerpoint"
+          : "canvas"
+      );
 
-      const response = await api.post("/templates/upload", formData);
+      const response = await api.post(
+        "/certificates/templates/upload",
+        formData
+      );
 
       if (response.data.success) {
         setSuccess("Template uploaded successfully!");
@@ -338,7 +357,9 @@ const CertificateTemplates: React.FC<CertificateTemplatesProps> = ({
     }
 
     try {
-      const response = await api.delete(`/templates/${templateId}`);
+      const response = await api.delete(
+        `/certificates/templates/${templateId}`
+      );
       if (response.data.success) {
         setSuccess("Template deleted successfully!");
         await loadTemplates();
@@ -353,7 +374,7 @@ const CertificateTemplates: React.FC<CertificateTemplatesProps> = ({
 
     try {
       const response = await api.put(
-        `/templates/${mappingTemplate.id}/mapping`,
+        `/certificates/templates/${mappingTemplate.id}/mapping`,
         {
           placeholderMapping: mapping,
         }

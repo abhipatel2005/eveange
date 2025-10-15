@@ -2,6 +2,11 @@ import { Router, Request, Response } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateToken } from "../middleware/auth.js";
 import { fileUploadRateLimit } from "../middleware/rateLimiting.js";
+import { TemplateService } from "../services/templateService.js";
+import {
+  CertificateGenerator,
+  AVAILABLE_DATA_FIELDS,
+} from "../services/certificateGenerator.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
@@ -137,88 +142,9 @@ export const DEFAULT_TEMPLATE = {
   },
 };
 
-// Available data fields for placeholder mapping
-export const AVAILABLE_DATA_FIELDS = [
-  {
-    key: "participant_name",
-    label: "Participant Name",
-    description: "Name of the certificate recipient",
-  },
-  {
-    key: "participant_email",
-    label: "Participant Email",
-    description: "Email address of the participant",
-  },
-  {
-    key: "event_title",
-    label: "Event Title",
-    description: "Name of the event",
-  },
-  {
-    key: "event_description",
-    label: "Event Description",
-    description: "Description of the event",
-  },
-  {
-    key: "event_date",
-    label: "Event Date",
-    description: "Date when the event took place",
-  },
-  {
-    key: "event_location",
-    label: "Event Location",
-    description: "Location where the event was held",
-  },
-  {
-    key: "certificate_code",
-    label: "Certificate Code",
-    description: "Unique verification code for the certificate",
-  },
-  {
-    key: "issue_date",
-    label: "Issue Date",
-    description: "Date when the certificate was issued",
-  },
-  {
-    key: "organizer_name",
-    label: "Organizer Name",
-    description: "Name of the event organizer",
-  },
-  {
-    key: "certificate_title",
-    label: "Certificate Title",
-    description: "Title of the certificate (e.g., 'Certificate of Completion')",
-  },
-];
+// Placeholder extraction function will be replaced with CertificateGenerator method
 
 // Function to extract placeholders from PowerPoint file
-const extractPlaceholdersFromPPTX = async (
-  filePath: string
-): Promise<string[]> => {
-  try {
-    const pptx = new PptxGenJS();
-
-    // For now, we'll use a regex to find placeholders in the file
-    // In a more advanced implementation, we could parse the PPTX XML
-    const fileBuffer = await fs.readFile(filePath);
-    const fileContent = fileBuffer.toString("binary");
-
-    // Find all {{placeholder}} patterns
-    const placeholderRegex = /\{\{([^}]+)\}\}/g;
-    const placeholders = new Set<string>();
-    let match;
-
-    while ((match = placeholderRegex.exec(fileContent)) !== null) {
-      placeholders.add(match[1].trim());
-    }
-
-    return Array.from(placeholders);
-  } catch (error) {
-    console.error("Error extracting placeholders:", error);
-    return [];
-  }
-};
-
 // GET /api/templates/data-fields - Get available data fields for mapping
 router.get(
   "/data-fields",
@@ -327,9 +253,10 @@ router.post(
       }
 
       // Extract placeholders from the uploaded PowerPoint file
-      const extractedPlaceholders = await extractPlaceholdersFromPPTX(
-        uploadedFile.path
-      );
+      const extractedPlaceholders =
+        await CertificateGenerator.extractPlaceholdersFromPPTX(
+          uploadedFile.path
+        );
 
       // Parse placeholder mapping if provided
       let mapping = {};
@@ -346,46 +273,77 @@ router.post(
         }
       }
 
-      // Create template record
+      // Create template configuration
       const templateConfig = {
         type: "powerpoint",
-        file_path: uploadedFile.path,
         file_name: uploadedFile.originalname,
         placeholders: extractedPlaceholders,
         placeholder_mapping: mapping,
         available_fields: AVAILABLE_DATA_FIELDS,
       };
 
-      const { data: newTemplate, error: createError } = await supabase
-        .from("certificate_templates")
-        .insert({
-          event_id: eventId,
-          name: templateName,
-          template: templateConfig,
-        })
-        .select("*")
-        .single();
+      try {
+        // Create template with Azure storage
+        const newTemplate = await TemplateService.createTemplateWithAzure(
+          eventId,
+          templateName,
+          uploadedFile.path,
+          uploadedFile.originalname,
+          templateConfig
+        );
 
-      if (createError) {
-        // Clean up uploaded file if database insert fails
+        // Clean up local uploaded file after successful Azure upload
         try {
           await fs.unlink(uploadedFile.path);
+          console.log(`🗑️ Cleaned up local file: ${uploadedFile.path}`);
         } catch (unlinkError) {
-          console.error("Error cleaning up file:", unlinkError);
+          console.warn("Could not clean up local file:", unlinkError);
         }
-        return res.status(500).json({ error: "Failed to create template" });
-      }
 
-      res.json({
-        success: true,
-        data: {
-          template: newTemplate,
-          extracted_placeholders: extractedPlaceholders,
-          needs_mapping:
-            extractedPlaceholders.length > 0 &&
-            Object.keys(mapping).length === 0,
-        },
-      });
+        res.json({
+          success: true,
+          data: newTemplate,
+          message: "Template uploaded successfully to Azure storage",
+        });
+      } catch (azureError) {
+        console.error("Azure upload failed:", azureError);
+
+        // Fallback to local storage if Azure fails
+        console.log("🔄 Falling back to local storage...");
+
+        const fallbackConfig = {
+          ...templateConfig,
+          file_path: uploadedFile.path,
+          uses_azure_storage: false,
+        };
+
+        const { data: newTemplate, error: createError } = await supabase
+          .from("certificate_templates")
+          .insert({
+            event_id: eventId,
+            name: templateName,
+            template: fallbackConfig,
+            uses_azure_storage: false,
+          })
+          .select("*")
+          .single();
+
+        if (createError) {
+          // Clean up uploaded file if database insert fails
+          try {
+            await fs.unlink(uploadedFile.path);
+          } catch (unlinkError) {
+            console.error("Error cleaning up file:", unlinkError);
+          }
+          return res.status(500).json({ error: "Failed to create template" });
+        }
+
+        res.json({
+          success: true,
+          data: newTemplate,
+          message: "Template uploaded to local storage (Azure unavailable)",
+        });
+      }
     } catch (error) {
       console.error("Error uploading template:", error);
 
@@ -533,22 +491,10 @@ router.delete(
         });
       }
 
-      // Delete associated file if it exists
-      if (existingTemplate.template?.file_path) {
-        try {
-          await fs.unlink(existingTemplate.template.file_path);
-        } catch (fileError) {
-          console.warn("Could not delete template file:", fileError);
-        }
-      }
+      // Use TemplateService to delete template (handles both Azure and local storage)
+      const deleteSuccess = await TemplateService.deleteTemplate(templateId);
 
-      // Delete template from database
-      const { error: deleteError } = await supabase
-        .from("certificate_templates")
-        .delete()
-        .eq("id", templateId);
-
-      if (deleteError) {
+      if (!deleteSuccess) {
         return res.status(500).json({ error: "Failed to delete template" });
       }
 
@@ -559,6 +505,130 @@ router.delete(
     } catch (error) {
       console.error("Error deleting template:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// POST /api/templates/migrate-to-azure - Migrate existing templates to Azure storage
+router.post(
+  "/migrate-to-azure",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+
+      // Only allow super admin or system admin to run migration
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (userError || !user || !["admin", "super_admin"].includes(user.role)) {
+        return res.status(403).json({
+          error:
+            "Access denied. Only administrators can run template migration.",
+        });
+      }
+
+      console.log(
+        `🚀 Starting template migration to Azure initiated by user ${userId}...`
+      );
+
+      const result = await TemplateService.migrateAllTemplatesToAzure();
+
+      res.json({
+        success: true,
+        message: "Template migration completed",
+        data: {
+          migrated: result.success,
+          failed: result.failed,
+          skipped: result.skipped,
+          total: result.success + result.failed + result.skipped,
+        },
+      });
+    } catch (error) {
+      console.error("Error in template migration API:", error);
+      res.status(500).json({
+        error: "Template migration failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+// POST /api/templates/:templateId/migrate-to-azure - Migrate specific template to Azure
+router.post(
+  "/:templateId/migrate-to-azure",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { templateId } = req.params;
+      const userId = (req as any).user.id;
+
+      // Check if user is organizer of the event that owns this template
+      const { data: template, error: templateError } = await supabase
+        .from("certificate_templates")
+        .select(
+          `
+          id,
+          event_id,
+          uses_azure_storage,
+          events!inner(organizer_id)
+        `
+        )
+        .eq("id", templateId)
+        .single();
+
+      if (templateError || !template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+
+      // Type assertion for events array
+      const events = template.events as any;
+      const organizerId = Array.isArray(events)
+        ? events[0]?.organizer_id
+        : events?.organizer_id;
+
+      if (organizerId !== userId) {
+        return res.status(403).json({
+          error:
+            "Access denied. Only event organizers can migrate their templates.",
+        });
+      }
+
+      if (template.uses_azure_storage) {
+        return res.json({
+          success: true,
+          message: "Template already uses Azure storage",
+          data: { alreadyMigrated: true },
+        });
+      }
+
+      console.log(`🔄 Migrating template ${templateId} to Azure...`);
+
+      const migrationSuccess = await TemplateService.migrateTemplateToAzure(
+        templateId
+      );
+
+      if (migrationSuccess) {
+        res.json({
+          success: true,
+          message: "Template migrated to Azure successfully",
+          data: { migrated: true },
+        });
+      } else {
+        res.status(500).json({
+          error: "Failed to migrate template to Azure",
+          data: { migrated: false },
+        });
+      }
+    } catch (error) {
+      console.error("Error migrating template:", error);
+      res.status(500).json({
+        error: "Template migration failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
 );

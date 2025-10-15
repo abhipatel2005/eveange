@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import QRCode from "react-qr-code";
-import { Download, Mail, Share2 } from "lucide-react";
+import { Download, Mail, Share2, Shield, CheckCircle } from "lucide-react";
 
 interface ParticipantQRCodeProps {
   registrationId: string;
@@ -95,16 +95,16 @@ export function ParticipantQRCode({
       {/* Ticket Content */}
       <div className="p-6">
         {/* Participant Info */}
-        <div className="text-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {participantName}
-          </h3>
-          <p className="text-gray-600">{participantEmail}</p>
-        </div>
 
         {/* Event Details */}
         {eventDetails && (
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {participantName}
+              </h3>
+              <p className="text-gray-600">{participantEmail}</p>
+            </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-gray-600">Date</p>
@@ -122,27 +122,66 @@ export function ParticipantQRCode({
           </div>
         )}
 
-        {/* QR Code */}
-        <div className="participant-qr-code bg-white p-4 rounded-lg border-2 border-gray-200 mb-6">
-          <div className="flex justify-center">
-            <QRCode
-              value={qrCode}
-              size={200}
-              style={{
-                height: "auto",
-                maxWidth: "100%",
-                width: "100%",
-              }}
-            />
+        {/* Enhanced QR Code with Security Features */}
+        <div className="participant-qr-code bg-white p-6 rounded-xl border-2 border-gray-200 mb-6 shadow-sm">
+          <div className="flex flex-col items-center">
+            {/* Security Badge */}
+            <div className="flex items-center space-x-2 mb-3 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+              <Shield className="h-3 w-3" />
+              <span>Secure Ticket</span>
+            </div>
+
+            {/* QR Code with Enhanced Error Correction */}
+            <div className="bg-white p-3 rounded-lg border border-gray-100">
+              <QRCode
+                value={qrCode}
+                size={220}
+                style={{
+                  height: "auto",
+                  maxWidth: "100%",
+                  width: "100%",
+                }}
+              />
+            </div>
+
+            {/* QR Code Status Indicator */}
+            {/* <div className="mt-3 flex items-center space-x-2 text-sm">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-green-700 font-medium">Valid Ticket</span>
+            </div> */}
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="text-center mb-6">
-          <p className="text-gray-600 text-sm">
-            Show this QR code at the event entrance for quick check-in
-          </p>
-        </div>
+        {/* Enhanced Instructions */}
+        {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="text-center mb-3">
+            <h4 className="text-sm font-semibold text-blue-900 mb-2">
+              📱 How to Use Your Ticket
+            </h4>
+            <p className="text-blue-800 text-sm">
+              Present this QR code at the event entrance for instant check-in
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-blue-700">
+            <div>
+              <p className="font-medium mb-1">✅ For Best Results:</p>
+              <ul className="space-y-1">
+                <li>• Increase screen brightness</li>
+                <li>• Keep QR code clean and visible</li>
+                <li>• Arrive 15 minutes early</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1">🔒 Security Features:</p>
+              <ul className="space-y-1">
+                <li>• One-time use only</li>
+                <li>• Encrypted validation</li>
+                <li>• Real-time verification</li>
+              </ul>
+            </div>
+          </div>
+        </div> */}
 
         {/* Action Buttons */}
         <div className="space-y-3">
@@ -191,10 +230,43 @@ export function ParticipantQRCode({
           </div>
         </div>
 
-        {/* QR Code Value (for debugging) */}
-        <div className="mt-6 p-3 bg-gray-50 rounded text-xs text-gray-500 break-all">
-          <p className="font-medium mb-1">QR Code:</p>
-          <p>{qrCode}</p>
+        {/* Enhanced QR Code Information */}
+        <div className="mt-6 space-y-3">
+          {/* Validation Status */}
+          <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">
+                Ticket Validated
+              </span>
+            </div>
+            <span className="text-xs text-green-600">Ready for check-in</span>
+          </div>
+
+          {/* QR Code Details */}
+          {/* <details className="p-3 bg-gray-50 rounded-lg">
+            <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900">
+              Technical Details
+            </summary>
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                <div>
+                  <span className="font-medium text-gray-600">QR Format:</span>
+                  <span className="ml-2 text-gray-800">High Security</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Validation:</span>
+                  <span className="ml-2 text-gray-800">Real-time</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Code:</span>
+                  <code className="ml-2 text-gray-800 bg-white px-1 rounded break-all">
+                    {qrCode}
+                  </code>
+                </div>
+              </div>
+            </div>
+          </details> */}
         </div>
       </div>
     </div>

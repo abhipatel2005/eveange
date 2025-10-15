@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useAuthStore } from "../store/authStore";
 import { Link } from "react-router-dom";
 import { Users, Calendar, Settings, BarChart3 } from "lucide-react";
 
@@ -15,6 +16,7 @@ interface Event {
 
 export function AdminDashboard() {
   const { user } = useAuth();
+  const { accessToken } = useAuthStore();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,10 +26,9 @@ export function AdminDashboard() {
 
   const fetchEvents = async () => {
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch("/api/events", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 

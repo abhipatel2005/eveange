@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 import { EmailService, EmailTemplateData } from "./emailService";
 import { getFreshAccessToken } from "../routes/emailAuth";
 
@@ -38,10 +38,13 @@ export class PaymentService {
         `🔍 Looking for registration: ${registrationId} for user: ${userId}`
       );
 
+      // Add a small delay in case there's a timing issue with registration creation
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // First, let's check if the registration exists at all
-      const { data: registrationCheck, error: checkError } = await supabase
+      const { data: registrationCheck, error: checkError } = await supabaseAdmin
         .from("registrations")
-        .select("id, user_id, event_id, status")
+        .select("id, user_id, event_id, status, payment_status, created_at")
         .eq("id", registrationId)
         .single();
 
@@ -50,7 +53,31 @@ export class PaymentService {
         checkError,
       });
 
-      const { data: registration, error: regError } = await supabase
+      if (checkError && checkError.code === "PGRST116") {
+        console.log(
+          `❌ Registration ${registrationId} does not exist in database`
+        );
+        throw new Error(`Registration ${registrationId} not found`);
+      }
+
+      if (registrationCheck && registrationCheck.user_id !== userId) {
+        console.log(
+          `❌ Registration belongs to user ${registrationCheck.user_id}, not ${userId}`
+        );
+        throw new Error("Registration belongs to a different user");
+      }
+
+      // Get all registrations for this user to debug
+      const { data: userRegs } = await supabaseAdmin
+        .from("registrations")
+        .select("id, status, payment_status, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      console.log(`🔍 Recent registrations for user ${userId}:`, userRegs);
+
+      let { data: registration, error: regError } = await supabaseAdmin
         .from("registrations")
         .select(
           `
@@ -73,12 +100,55 @@ export class PaymentService {
       if (regError) {
         console.error(`❌ Registration query error:`, regError);
         if (regError.code === "PGRST116") {
-          if (registrationCheck && registrationCheck.user_id !== userId) {
-            throw new Error("Registration belongs to a different user");
+          // Try without status filter to see what the actual registration looks like
+          console.log(
+            `🔄 Trying to fetch registration without status filter...`
+          );
+          const { data: regWithoutFilter, error: regNoFilterError } =
+            await supabaseAdmin
+              .from("registrations")
+              .select(
+                `
+              *,
+              events (
+                id,
+                title,
+                price,
+                is_paid
+              )
+            `
+              )
+              .eq("id", registrationId)
+              .eq("user_id", userId)
+              .single();
+
+          console.log(`📋 Registration without filter:`, {
+            regWithoutFilter,
+            regNoFilterError,
+          });
+
+          if (regNoFilterError) {
+            throw new Error("Registration not found or has been cancelled");
           }
-          throw new Error("Registration not found or has been cancelled");
+
+          if (regWithoutFilter) {
+            // Check the actual status
+            if (regWithoutFilter.status === "cancelled") {
+              throw new Error("Registration has been cancelled");
+            }
+            if (regWithoutFilter.payment_status === "completed") {
+              throw new Error(
+                "Registration payment has already been completed"
+              );
+            }
+            // Use this registration if it exists
+            registration = regWithoutFilter;
+          } else {
+            throw new Error("Registration not found or has been cancelled");
+          }
+        } else {
+          throw new Error(`Database error: ${regError.message}`);
         }
-        throw new Error(`Database error: ${regError.message}`);
       }
 
       if (!registration) {
@@ -90,7 +160,7 @@ export class PaymentService {
       }
 
       // Fetch user details
-      const { data: userData, error: userError } = await supabase
+      const { data: userData, error: userError } = await supabaseAdmin
         .from("users")
         .select("name, email")
         .eq("id", userId)
@@ -101,7 +171,7 @@ export class PaymentService {
       }
 
       // Create payment record
-      const { data: payment, error: paymentError } = await supabase
+      const { data: payment, error: paymentError } = await supabaseAdmin
         .from("payments")
         .insert({
           registration_id: registrationId,
@@ -145,7 +215,7 @@ export class PaymentService {
       });
 
       // Update payment record with Stripe payment intent ID
-      await supabase
+      await supabaseAdmin
         .from("payments")
         .update({
           gateway_payment_id: paymentIntent.id,
@@ -178,7 +248,7 @@ export class PaymentService {
       const { paymentIntentId, paymentMethodId } = verificationData;
 
       // Fetch payment record
-      const { data: payment, error: paymentError } = await supabase
+      const { data: payment, error: paymentError } = await supabaseAdmin
         .from("payments")
         .select("*")
         .eq("id", paymentId)
@@ -198,7 +268,7 @@ export class PaymentService {
       }
 
       // Update payment record
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("payments")
         .update({
           status: "completed",
@@ -221,7 +291,7 @@ export class PaymentService {
       }
 
       // Update registration status to confirmed
-      const { error: regUpdateError } = await supabase
+      const { error: regUpdateError } = await supabaseAdmin
         .from("registrations")
         .update({
           payment_status: "completed",
@@ -260,7 +330,7 @@ export class PaymentService {
   // Get payment details
   static async getPaymentDetails(paymentId: string, userId: string) {
     try {
-      const { data: payment, error } = await supabase
+      const { data: payment, error } = await supabaseAdmin
         .from("payments")
         .select(
           `
@@ -302,7 +372,7 @@ export class PaymentService {
         data: payments,
         error,
         count,
-      } = await supabase
+      } = await supabaseAdmin
         .from("payments")
         .select(
           `
@@ -385,7 +455,7 @@ export class PaymentService {
       }
 
       // Update payment status
-      const { error: paymentUpdateError } = await supabase
+      const { error: paymentUpdateError } = await supabaseAdmin
         .from("payments")
         .update({
           status: "completed",
@@ -406,7 +476,7 @@ export class PaymentService {
       // Update registration status
       const registrationId = paymentIntent.metadata.registrationId;
       if (registrationId) {
-        const { error: regUpdateError } = await supabase
+        const { error: regUpdateError } = await supabaseAdmin
           .from("registrations")
           .update({
             payment_status: "completed",
@@ -452,7 +522,7 @@ export class PaymentService {
       }
 
       // Update payment status
-      const { error: failureUpdateError } = await supabase
+      const { error: failureUpdateError } = await supabaseAdmin
         .from("payments")
         .update({
           status: "failed",
@@ -476,7 +546,7 @@ export class PaymentService {
   private static async sendPaymentConfirmationEmail(registrationId: string) {
     try {
       // Fetch registration with event and user details
-      const { data: registration, error: regError } = await supabase
+      const { data: registration, error: regError } = await supabaseAdmin
         .from("registrations")
         .select(
           `

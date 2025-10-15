@@ -27,7 +27,7 @@ interface CheckInDashboardProps {
 }
 
 export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
-  const { accessToken } = useAuthStore();
+  const { accessToken, user, validateToken, clearAuth } = useAuthStore();
   const [stats, setStats] = useState<CheckInStats>({
     total_registrations: 0,
     total_check_ins: 0,
@@ -43,6 +43,16 @@ export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
   } | null>(null);
 
   useEffect(() => {
+    // Validate token before making requests
+    if (!validateToken()) {
+      console.error("❌ Invalid or expired token detected");
+      setLastCheckIn({
+        name: "Authentication Error",
+        time: "Please refresh and login again",
+      });
+      return;
+    }
+
     fetchStats();
     // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
@@ -51,8 +61,15 @@ export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
 
   const fetchStats = async () => {
     try {
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      const API_BASE_URL =
+        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
       const response = await fetch(
-        `/api/checkin/events/${eventId}/check-in-stats`,
+        `${API_BASE_URL}/checkin/events/${eventId}/stats`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -75,7 +92,17 @@ export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
   };
 
   const handleScan = async (qrCode: string) => {
-    const response = await fetch(`/api/checkin/events/${eventId}/check-in`, {
+    if (!accessToken) {
+      throw new Error(
+        "Authentication required. Please refresh the page and login again."
+      );
+    }
+
+    const API_BASE_URL =
+      import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+    const fullUrl = `${API_BASE_URL}/checkin/events/${eventId}`;
+
+    const response = await fetch(fullUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -92,11 +119,20 @@ export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(
+          "Authentication failed. Please refresh the page and login again."
+        );
+      }
+
       const error = await response.json();
-      throw new Error(error.error || "Failed to check in participant");
+      throw new Error(
+        error.error || error.message || "Failed to check in participant"
+      );
     }
 
     const result = await response.json();
+    console.log("✅ Check-in successful:", result);
 
     // Update UI with success
     setLastCheckIn({
@@ -119,6 +155,32 @@ export function CheckInDashboard({ eventId }: CheckInDashboardProps) {
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
   );
+
+  // Check for authentication issues
+  if (!accessToken || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto">
+          <div className="text-6xl mb-4">🔐</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Authentication Required
+          </h1>
+          <p className="text-gray-600 mb-4">
+            You need to be logged in to access the check-in system.
+          </p>
+          <button
+            onClick={() => {
+              clearAuth();
+              window.location.href = "/login";
+            }}
+            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Login Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
