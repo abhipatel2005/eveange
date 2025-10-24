@@ -70,7 +70,62 @@ app.use(sanitizeQueryParams);
 
 app.use(requestLogger);
 
-// Static file serving for uploads
+// Azure-based file serving for templates and certificates
+app.get("/uploads/templates/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    console.log(`📥 Serving template from Azure: ${filename}`);
+
+    // Try to download from Azure templates container
+    const { azureBlobService } = await import("./config/azure.js");
+    const fileBuffer = await azureBlobService.downloadTemplate(filename);
+
+    // Set appropriate headers
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(fileBuffer);
+  } catch (error) {
+    console.error(`❌ Error serving template ${req.params.filename}:`, error);
+    res.status(404).json({ error: "Template not found" });
+  }
+});
+
+app.get("/uploads/certificates/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    console.log(`📥 Serving certificate from Azure: ${filename}`);
+
+    // Try to download from Azure certificates container
+    const { azureBlobService } = await import("./config/azure.js");
+    const fileBuffer = await azureBlobService.downloadCertificate(filename);
+
+    // Set appropriate headers based on file extension
+    const ext = filename.toLowerCase().split(".").pop();
+    const contentType =
+      ext === "png"
+        ? "image/png"
+        : ext === "jpg" || ext === "jpeg"
+        ? "image/jpeg"
+        : ext === "pdf"
+        ? "application/pdf"
+        : "application/octet-stream";
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(fileBuffer);
+  } catch (error) {
+    console.error(
+      `❌ Error serving certificate ${req.params.filename}:`,
+      error
+    );
+    res.status(404).json({ error: "Certificate not found" });
+  }
+});
+
+// Fallback: Static file serving for any remaining local uploads (for backwards compatibility)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Health check

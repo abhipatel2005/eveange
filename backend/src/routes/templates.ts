@@ -283,21 +283,28 @@ router.post(
       };
 
       try {
-        // Create template with Azure storage
+        // Create template with Azure storage using file buffer directly
+        console.log(`📤 Creating template with direct Azure upload...`);
+
+        // Read file buffer from uploaded file
+        const fileBuffer = await fs.readFile(uploadedFile.path);
+
         const newTemplate = await TemplateService.createTemplateWithAzure(
           eventId,
           templateName,
-          uploadedFile.path,
+          fileBuffer, // Pass buffer instead of file path
           uploadedFile.originalname,
           templateConfig
         );
 
-        // Clean up local uploaded file after successful Azure upload
+        // Clean up local uploaded file immediately after reading
         try {
           await fs.unlink(uploadedFile.path);
-          console.log(`🗑️ Cleaned up local file: ${uploadedFile.path}`);
+          console.log(
+            `🗑️ Cleaned up temporary local file: ${uploadedFile.path}`
+          );
         } catch (unlinkError) {
-          console.warn("Could not clean up local file:", unlinkError);
+          console.warn("Could not clean up temporary file:", unlinkError);
         }
 
         res.json({
@@ -311,19 +318,26 @@ router.post(
         // Fallback to local storage if Azure fails
         console.log("🔄 Falling back to local storage...");
 
-        const fallbackConfig = {
-          ...templateConfig,
-          file_path: uploadedFile.path,
-          uses_azure_storage: false,
-        };
-
         const { data: newTemplate, error: createError } = await supabase
           .from("certificate_templates")
           .insert({
             event_id: eventId,
             name: templateName,
-            template: fallbackConfig,
-            uses_azure_storage: false,
+            type: "powerpoint", // Individual column
+            template: {
+              file_path: uploadedFile.path,
+              file_name: uploadedFile.originalname,
+              type: "powerpoint",
+              placeholders: extractedPlaceholders,
+              placeholder_mapping: mapping,
+              available_fields: AVAILABLE_DATA_FIELDS,
+            }, // JSONB column with template configuration
+            extracted_placeholders: extractedPlaceholders || [], // Individual column
+            placeholder_mapping: mapping || {}, // Individual column
+            template_data: {}, // Individual column
+            file_path: uploadedFile.path, // Individual column for local file path
+            uses_azure_storage: false, // Individual column for storage type
+            azure_url: null, // Individual column - null for local storage
           })
           .select("*")
           .single();

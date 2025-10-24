@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import { CertificateGenerator, AVAILABLE_DATA_FIELDS, } from "../services/certificateGenerator";
+import { TemplateService } from "../services/templateService";
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 // Configure multer for template uploads
 const storage = multer.diskStorage({
@@ -115,35 +116,86 @@ export const certificateController = {
                 placeholders.forEach((placeholder) => {
                     placeholderMapping[placeholder] = ""; // Will be mapped by user
                 });
-                // Save template to database
-                const { data, error } = await supabase
-                    .from("certificate_templates")
-                    .insert({
-                    event_id: eventId || null, // Allow null for global templates
-                    name,
-                    type,
-                    file_path: filePath,
-                    template: templateData, // Use 'template' field as per your schema
-                    template_data: templateData,
+                // Create template configuration
+                const templateConfig = {
+                    type: type,
+                    file_name: req.file.originalname,
+                    placeholders: placeholders,
                     placeholder_mapping: placeholderMapping,
-                    extracted_placeholders: placeholders,
-                })
-                    .select()
-                    .single();
-                if (error) {
-                    throw error;
+                    available_fields: AVAILABLE_DATA_FIELDS,
+                };
+                try {
+                    // Create template with Azure storage
+                    console.log(`📤 Creating template with Azure storage...`);
+                    const newTemplate = await TemplateService.createTemplateWithAzure(eventId || null, name, filePath, req.file.originalname, templateConfig);
+                    // Clean up local uploaded file after successful Azure upload
+                    try {
+                        await fs.unlink(filePath);
+                        console.log(`🗑️ Cleaned up local file: ${filePath}`);
+                    }
+                    catch (unlinkError) {
+                        console.warn("Could not clean up local file:", unlinkError);
+                    }
+                    res.json({
+                        success: true,
+                        data: {
+                            template: newTemplate,
+                            placeholders,
+                            message: "Template uploaded successfully to Azure storage.",
+                        },
+                    });
                 }
-                res.json({
-                    success: true,
-                    data: {
-                        template: data,
-                        placeholders,
-                        message: "Template uploaded successfully. Please configure placeholder mappings.",
-                    },
-                });
+                catch (azureError) {
+                    console.error("❌ Azure upload failed:", azureError);
+                    // Fallback to local storage if Azure fails
+                    console.log("🔄 Falling back to local storage...");
+                    const fallbackConfig = {
+                        ...templateConfig,
+                        file_path: filePath,
+                        uses_azure_storage: false,
+                    };
+                    // Save template to database with local storage
+                    const { data, error } = await supabase
+                        .from("certificate_templates")
+                        .insert({
+                        event_id: eventId || null, // Allow null for global templates
+                        name,
+                        template: fallbackConfig,
+                        uses_azure_storage: false,
+                    })
+                        .select()
+                        .single();
+                    if (error) {
+                        // Clean up uploaded file if database insert fails
+                        try {
+                            await fs.unlink(filePath);
+                        }
+                        catch (unlinkError) {
+                            console.error("Error cleaning up file:", unlinkError);
+                        }
+                        throw error;
+                    }
+                    res.json({
+                        success: true,
+                        data: {
+                            template: data,
+                            placeholders,
+                            message: "Template uploaded to local storage (Azure unavailable).",
+                        },
+                    });
+                }
             }
             catch (error) {
                 console.error("Error uploading template:", error);
+                // Clean up uploaded file on error
+                if (req.file) {
+                    try {
+                        await fs.unlink(req.file.path);
+                    }
+                    catch (unlinkError) {
+                        console.error("Error cleaning up file:", unlinkError);
+                    }
+                }
                 res.status(500).json({
                     success: false,
                     message: "Failed to upload template",

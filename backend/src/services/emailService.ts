@@ -1268,7 +1268,7 @@ export class EmailService {
             <div style="text-align: center; margin-bottom: 30px;">
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px;">
                 <p style="color: #856404; margin: 0; font-size: 14px;">
-                  📎 <strong>Certificate Attachment:</strong> Your certificate will be attached to this email You can download them within in the span of 30 days.
+                  📎 <strong>Certificate Attachment:</strong> Your certificate is attached to this email You can download them within in the span of 30 days.
                 </p>
               </div>
             </div>
