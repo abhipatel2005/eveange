@@ -175,3 +175,37 @@ export function handleError(
 
   return message;
 }
+
+/**
+ * Simple error handler for basic cases (legacy compatibility)
+ */
+export function handleErrorSimple(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+
+  return "An unexpected error occurred";
+}
+
+/**
+ * Logs error details for debugging while returning user-friendly message
+ */
+export function handleErrorWithLogging(
+  error: unknown,
+  context?: string
+): string {
+  const message = handleErrorSimple(error);
+  // Only log errors in development
+  if (import.meta.env.DEV) {
+    console.error(`Error${context ? ` in ${context}` : ""}:`, error);
+  }
+  return message;
+}

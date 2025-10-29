@@ -808,36 +808,72 @@ export class EmailService {
      * Send certificate email with certificate attachment
      */
     static async sendCertificateEmail(participantEmail, participantName, eventTitle, certificateUrl, certificateCode, verificationCode, customMessage, userEmail, userAccessToken, userRefreshToken) {
-        try {
-            // Get certificate attachment from Azure Blob Storage
-            let certificateAttachment = null;
-            if (certificateUrl &&
-                (certificateUrl.includes("blob.core.windows.net") ||
-                    certificateUrl.includes("sig="))) {
-                try {
-                    console.log(`📎 Downloading certificate from Azure for attachment...`);
-                    // Extract filename from Azure URL (handle both regular and SAS URLs)
-                    const urlParts = certificateUrl.split("/");
-                    let fileName = urlParts[urlParts.length - 1];
-                    // Remove SAS query parameters if present
-                    if (fileName.includes("?")) {
-                        fileName = fileName.split("?")[0];
-                    }
-                    console.log(`📎 Extracting filename: ${fileName}`);
-                    // Download certificate from Azure Blob Storage
-                    const certificateBuffer = await azureBlobService.downloadCertificate(fileName);
-                    certificateAttachment = {
-                        filename: `certificate-${certificateCode}.pptx`,
-                        content: certificateBuffer,
-                        contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    };
-                    console.log(`✅ Certificate downloaded successfully for email attachment (${certificateBuffer.length} bytes)`);
+        // Get certificate attachment from Azure Blob Storage
+        let certificateAttachment = null;
+        console.log(`🔍 Certificate URL received: ${certificateUrl}`);
+        if (certificateUrl &&
+            (certificateUrl.includes("blob.core.windows.net") ||
+                certificateUrl.includes("sig="))) {
+            try {
+                console.log(`📎 Downloading certificate from Azure for attachment...`);
+                // Extract filename from Azure URL (handle both regular and SAS URLs)
+                const urlParts = certificateUrl.split("/");
+                let fileName = urlParts[urlParts.length - 1];
+                // Remove SAS query parameters if present
+                if (fileName.includes("?")) {
+                    fileName = fileName.split("?")[0];
                 }
-                catch (downloadError) {
-                    console.error("❌ Failed to download certificate for attachment:", downloadError);
-                    // Continue without attachment
+                console.log(`📎 Extracting filename: ${fileName}`);
+                console.log(`📎 Full certificate URL: ${certificateUrl}`);
+                // Download certificate from Azure Blob Storage
+                const certificateBuffer = await azureBlobService.downloadCertificate(fileName);
+                console.log(`📥 Downloaded certificate buffer: ${certificateBuffer.length} bytes`);
+                // Detect file type based on content and filename
+                let fileExtension = "pptx";
+                let contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                // Check if it's a PDF by examining the buffer header first
+                const bufferHeader = certificateBuffer.subarray(0, 4).toString();
+                console.log(`🔍 Buffer header check: "${bufferHeader}"`);
+                if (bufferHeader === "%PDF") {
+                    fileExtension = "pdf";
+                    contentType = "application/pdf";
+                    console.log(`🔍 Detected PDF certificate from buffer header`);
                 }
+                else if (fileName.toLowerCase().endsWith(".pdf")) {
+                    fileExtension = "pdf";
+                    contentType = "application/pdf";
+                    console.log(`🔍 Detected PDF certificate from filename`);
+                }
+                else if (fileName.toLowerCase().endsWith(".png")) {
+                    fileExtension = "png";
+                    contentType = "image/png";
+                    console.log(`🔍 Detected PNG certificate from filename`);
+                }
+                else {
+                    console.log(`🔍 Using default PPTX format - filename: ${fileName}, header: ${bufferHeader}`);
+                }
+                certificateAttachment = {
+                    filename: `certificate-${certificateCode}.${fileExtension}`,
+                    content: certificateBuffer,
+                    contentType: contentType,
+                };
+                console.log(`✅ Certificate attachment created: ${certificateAttachment.filename} (${certificateBuffer.length} bytes, ${fileExtension.toUpperCase()})`);
             }
+            catch (downloadError) {
+                console.error("❌ Failed to download certificate for attachment:", downloadError);
+                console.error("❌ Download error details:", {
+                    certificateUrl,
+                    error: downloadError instanceof Error
+                        ? downloadError.message
+                        : String(downloadError),
+                });
+                // Continue without attachment
+            }
+        }
+        else {
+            console.warn(`⚠️ Certificate URL is not an Azure blob URL: ${certificateUrl}`);
+        }
+        try {
             // First try SMTP approach
             const transporter = await getTransporter(userEmail, userAccessToken, userRefreshToken);
             const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage);
@@ -852,7 +888,24 @@ export class EmailService {
             // Add attachment if available
             if (certificateAttachment) {
                 mailOptions.attachments = [certificateAttachment];
+                console.log(`📎 Attachment added to email:`, {
+                    filename: certificateAttachment.filename,
+                    contentType: certificateAttachment.contentType,
+                    size: certificateAttachment.content.length,
+                });
             }
+            else {
+                console.warn(`⚠️ No certificate attachment available for email`);
+            }
+            console.log(`📧 Sending email via SMTP with mailOptions:`, {
+                from: mailOptions.from,
+                to: mailOptions.to,
+                subject: mailOptions.subject,
+                hasAttachments: !!mailOptions.attachments,
+                attachmentCount: mailOptions.attachments
+                    ? mailOptions.attachments.length
+                    : 0,
+            });
             const result = await transporter.sendMail(mailOptions);
             console.log("📧 Certificate email sent successfully via SMTP, messageId:", result.messageId);
             console.log("📧 Sent from:", fromEmail, "to:", participantEmail);
@@ -865,7 +918,7 @@ export class EmailService {
                 try {
                     console.log("🔄 Attempting certificate email via Gmail API...");
                     const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage);
-                    await sendEmailViaGmailAPI(userEmail, userAccessToken, participantEmail, `🎉 Your Certificate for ${eventTitle}`, htmlContent, userRefreshToken || "");
+                    await sendEmailViaGmailAPI(userEmail, userAccessToken, userRefreshToken || "", participantEmail, `🎉 Your Certificate for ${eventTitle}`, htmlContent, certificateAttachment || undefined);
                     console.log("✅ Certificate email sent successfully via Gmail API");
                     return true;
                 }
@@ -945,7 +998,7 @@ export class EmailService {
             <div style="text-align: center; margin-bottom: 30px;">
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px;">
                 <p style="color: #856404; margin: 0; font-size: 14px;">
-                  📎 <strong>Certificate Attachment:</strong> Your certificate will be attached to this email You can download them within in the span of 30 days.
+                  📎 <strong>Certificate Attachment:</strong> Your certificate is attached to this email You can download them within in the span of 30 days.
                 </p>
               </div>
             </div>

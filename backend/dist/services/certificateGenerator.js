@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import EmailService from "./emailService.js";
 import { azureBlobService } from "../config/azure.js";
 import { TemplateService } from "./templateService.js";
+import { SimplePdfConverter } from "./simplePdfConverter.js";
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 export const AVAILABLE_DATA_FIELDS = [
     // Participant fields
@@ -370,9 +371,20 @@ export class CertificateGenerator {
                     level: 6, // Balanced compression level (0-9)
                 },
             });
-            const finalBuffer = Buffer.from(result);
-            console.log(`📦 Generated certificate: ${finalBuffer.length} bytes`);
-            return finalBuffer;
+            const pptxBuffer = Buffer.from(result);
+            console.log(`📦 Generated PPTX certificate: ${pptxBuffer.length} bytes`);
+            // Convert PPTX to PDF for security (non-editable format)
+            console.log(`🔄 Converting PPTX certificate to PDF...`);
+            try {
+                const pdfBuffer = await SimplePdfConverter.convertPptxToPdf(pptxBuffer);
+                console.log(`✅ PDF conversion successful: ${pdfBuffer.length} bytes`);
+                return pdfBuffer;
+            }
+            catch (pdfError) {
+                console.error(`❌ PDF conversion failed:`, pdfError);
+                console.warn(`⚠️ Returning original PPTX as fallback`);
+                return pptxBuffer;
+            }
         }
         catch (error) {
             console.error("Error generating PowerPoint certificate:", error);
@@ -546,7 +558,27 @@ export class CertificateGenerator {
     static async emailCertificate(participantEmail, participantName, eventTitle, certificateUrl, certificateCode, verificationCode, customMessage, sentByUserId) {
         try {
             console.log(`📧 Sending certificate email to ${participantEmail}...`);
-            const success = await EmailService.sendCertificateEmail(participantEmail, participantName, eventTitle, certificateUrl, certificateCode, verificationCode, customMessage);
+            // Get user email credentials if available
+            let userEmail, userAccessToken, userRefreshToken;
+            if (sentByUserId) {
+                try {
+                    const { data: userAuth } = await supabase
+                        .from("user_email_auth")
+                        .select("email, access_token, refresh_token")
+                        .eq("user_id", sentByUserId)
+                        .single();
+                    if (userAuth) {
+                        userEmail = userAuth.email;
+                        userAccessToken = userAuth.access_token;
+                        userRefreshToken = userAuth.refresh_token;
+                        console.log(`📧 Using user email credentials for ${userEmail}`);
+                    }
+                }
+                catch (authError) {
+                    console.warn(`⚠️ Could not get user email credentials:`, authError);
+                }
+            }
+            const success = await EmailService.sendCertificateEmail(participantEmail, participantName, eventTitle, certificateUrl, certificateCode, verificationCode, customMessage, userEmail, userAccessToken, userRefreshToken);
             if (!success) {
                 throw new Error("Failed to send certificate email");
             }

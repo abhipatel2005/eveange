@@ -68,8 +68,6 @@ export default function RegistrationFormBuilder() {
   useEffect(() => {
     if (!eventId) return;
 
-    // console.log("RegistrationFormBuilder: Loading event ID:", eventId);
-
     // Load the specific event data
     loadEvent(eventId);
     // Load form templates

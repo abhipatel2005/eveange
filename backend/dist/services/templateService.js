@@ -101,32 +101,40 @@ export class TemplateService {
         }
     }
     /**
-     * Create new template with Azure storage
+     * Create new template with direct Azure upload (no local storage)
      */
-    static async createTemplateWithAzure(eventId, templateName, filePath, originalFileName, templateConfig) {
+    static async createTemplateWithAzure(eventId, templateName, fileBuffer, originalFileName, templateConfig) {
         try {
-            console.log(`📝 Creating new template with Azure storage...`);
+            console.log(`📝 Creating new template with direct Azure upload...`);
             // Generate template ID
             const templateId = crypto.randomUUID();
-            // Upload to Azure first
-            const { azureUrl, azureFileName } = await this.uploadTemplateToAzure(templateId, filePath, originalFileName);
-            // Update template config to include Azure info
-            const updatedConfig = {
-                ...templateConfig,
-                azure_url: azureUrl,
-                azure_file_name: azureFileName,
-                uses_azure_storage: true,
-            };
-            // Create database record
+            // Generate Azure file name
+            const azureFileName = azureBlobService.generateTemplateFileName(templateId, originalFileName);
+            // Upload directly to Azure from buffer
+            console.log(`📤 Uploading template ${templateId} directly to Azure...`);
+            const azureUrl = await azureBlobService.uploadTemplate(azureFileName, fileBuffer, templateId);
+            // Generate secure SAS URL
+            const secureUrl = await azureBlobService.getSecureTemplateUrl(azureFileName);
+            // Create database record with ALL columns properly populated
             const { data: newTemplate, error: createError } = await supabase
                 .from("certificate_templates")
                 .insert({
                 id: templateId,
                 event_id: eventId,
                 name: templateName,
-                template: updatedConfig,
-                azure_url: azureUrl,
-                uses_azure_storage: true,
+                type: templateConfig.type || "powerpoint", // Individual column
+                template: {
+                    azure_file_name: azureFileName,
+                    file_name: originalFileName,
+                    type: templateConfig.type || "powerpoint",
+                    ...templateConfig,
+                }, // JSONB column with template configuration
+                azure_url: secureUrl, // Individual column for Azure URL
+                uses_azure_storage: true, // Individual column for storage type
+                extracted_placeholders: templateConfig.placeholders || [], // Individual column
+                placeholder_mapping: templateConfig.placeholder_mapping || {}, // Individual column
+                template_data: templateConfig.template_data || {}, // Individual column
+                file_path: null, // No local file path for Azure storage
             })
                 .select("*")
                 .single();
@@ -140,7 +148,7 @@ export class TemplateService {
                 }
                 throw new Error(`Failed to create template: ${createError.message}`);
             }
-            console.log(`✅ Template created successfully with Azure storage`);
+            console.log(`✅ Template created successfully with direct Azure upload`);
             return newTemplate;
         }
         catch (error) {

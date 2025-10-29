@@ -562,6 +562,349 @@ const CertificateManagementPage: React.FC = () => {
         </div>
 
         {/* Generated Certificates */}
+        {/* <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Generated Certificates ({certificates.length} total)
+          </h2>
+
+          {certificates.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No certificates have been generated yet. Select a template and
+                participants above to generate certificates.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setSelectedCertificates(certificates.map((c) => c.id))
+                  }
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedCertificates([])}
+                >
+                  Clear Selection
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={selectedCertificates.length === 0}
+                  onClick={async () => {
+                    try {
+                      await apiClient.post(
+                        `/certificates/events/${eventId}/email`,
+                        {
+                          certificateIds: selectedCertificates,
+                        }
+                      );
+                      showMessage(
+                        "success",
+                        `Emailed ${selectedCertificates.length} certificates successfully`
+                      );
+                    } catch (error: any) {
+                      console.error("Error emailing certificates:", error);
+                      showMessage("error", "Failed to email certificates");
+                    }
+                  }}
+                >
+                  Email Selected ({selectedCertificates.length})
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedCertificates.length === certificates.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCertificates(
+                                certificates.map((c) => c.id)
+                              );
+                            } else {
+                              setSelectedCertificates([]);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Participant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Verification Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Generated Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {certificates.map((certificate) => (
+                      <tr key={certificate.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedCertificates.includes(
+                              certificate.id
+                            )}
+                            onChange={() => {
+                              setSelectedCertificates((prev) =>
+                                prev.includes(certificate.id)
+                                  ? prev.filter((id) => id !== certificate.id)
+                                  : [...prev, certificate.id]
+                              );
+                            }}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                          {certificate.registrations?.name || "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {certificate.registrations?.email || "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                            {certificate.verification_code}
+                          </code>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(
+                            certificate.created_at
+                          ).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {certificate.email_sent ? (
+                            <div className="flex items-center">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Sent
+                              </span>
+                              {certificate.email_sent_at && (
+                                <span className="ml-2 text-xs text-gray-400">
+                                  {new Date(
+                                    certificate.email_sent_at
+                                  ).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Not Sent
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (certificate.file_url) {
+                                  window.open(certificate.file_url, "_blank");
+                                } else {
+                                  showMessage(
+                                    "error",
+                                    "Certificate file not available"
+                                  );
+                                }
+                              }}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await apiClient.post(
+                                    `/certificates/events/${eventId}/email`,
+                                    {
+                                      certificateIds: [certificate.id],
+                                    }
+                                  );
+                                  showMessage(
+                                    "success",
+                                    "Certificate emailed successfully"
+                                  );
+                                } catch (error: any) {
+                                  console.error(
+                                    "Error emailing certificate:",
+                                    error
+                                  );
+                                  showMessage(
+                                    "error",
+                                    "Failed to email certificate"
+                                  );
+                                }
+                              }}
+                            >
+                              Email
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div> */}
+
+        {/* Participants Selection */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Select Participants ({participants.length} eligible)
+          </h2>
+
+          {participants.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No eligible participants found. Only participants who attended
+                the event can receive certificates.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setSelectedParticipants(participants.map((p) => p.id))
+                  }
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedParticipants([])}
+                >
+                  Clear Selection
+                </Button>
+                <span className="text-sm text-gray-600">
+                  {selectedParticipants.length} of {participants.length}{" "}
+                  selected
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedParticipants.length === participants.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedParticipants(
+                                participants.map((p) => p.id)
+                              );
+                            } else {
+                              setSelectedParticipants([]);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Attendance
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Organization
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {participants.map((participant) => (
+                      <tr key={participant.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedParticipants.includes(
+                              participant.id
+                            )}
+                            onChange={() =>
+                              toggleParticipantSelection(participant.id)
+                            }
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                          {participant.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.attendance_date
+                            ? new Date(
+                                participant.attendance_date
+                              ).toLocaleDateString()
+                            : "Attended"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {participant.organization || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Generate Certificates */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <Button
+            onClick={handleGenerateCertificates}
+            disabled={
+              isGenerating || !selectedTemplate || participants.length === 0
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isGenerating
+              ? "Generating Certificates..."
+              : "Generate Certificates"}
+          </Button>
+        </div>
+
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">
             Generated Certificates ({certificates.length} total)
@@ -772,137 +1115,6 @@ const CertificateManagementPage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Participants Selection */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Select Participants ({participants.length} eligible)
-          </h2>
-
-          {participants.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">
-                No eligible participants found. Only participants who attended
-                the event can receive certificates.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex gap-2 items-center">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setSelectedParticipants(participants.map((p) => p.id))
-                  }
-                >
-                  Select All
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setSelectedParticipants([])}
-                >
-                  Clear Selection
-                </Button>
-                <span className="text-sm text-gray-600">
-                  {selectedParticipants.length} of {participants.length}{" "}
-                  selected
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        <input
-                          type="checkbox"
-                          checked={
-                            selectedParticipants.length === participants.length
-                          }
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedParticipants(
-                                participants.map((p) => p.id)
-                              );
-                            } else {
-                              setSelectedParticipants([]);
-                            }
-                          }}
-                          className="rounded"
-                        />
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Attendance
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Organization
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {participants.map((participant) => (
-                      <tr key={participant.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedParticipants.includes(
-                              participant.id
-                            )}
-                            onChange={() =>
-                              toggleParticipantSelection(participant.id)
-                            }
-                            className="rounded"
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                          {participant.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {participant.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {participant.attendance_date
-                            ? new Date(
-                                participant.attendance_date
-                              ).toLocaleDateString()
-                            : "Attended"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {participant.organization || "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Generate Certificates */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <Button
-            onClick={handleGenerateCertificates}
-            disabled={
-              isGenerating || !selectedTemplate || participants.length === 0
-            }
-            className="w-full"
-            size="lg"
-          >
-            {isGenerating
-              ? "Generating Certificates..."
-              : "Generate Certificates"}
-          </Button>
         </div>
 
         {/* Placeholder Mapping Modal */}

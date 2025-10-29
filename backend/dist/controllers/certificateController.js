@@ -125,16 +125,19 @@ export const certificateController = {
                     available_fields: AVAILABLE_DATA_FIELDS,
                 };
                 try {
-                    // Create template with Azure storage
-                    console.log(`📤 Creating template with Azure storage...`);
-                    const newTemplate = await TemplateService.createTemplateWithAzure(eventId || null, name, filePath, req.file.originalname, templateConfig);
-                    // Clean up local uploaded file after successful Azure upload
+                    // Create template with Azure storage using file buffer directly
+                    console.log(`📤 Creating template with direct Azure upload...`);
+                    // Read file buffer from uploaded file
+                    const fileBuffer = await fs.readFile(filePath);
+                    const newTemplate = await TemplateService.createTemplateWithAzure(eventId || null, name, fileBuffer, // Pass buffer instead of file path
+                    req.file.originalname, templateConfig);
+                    // Clean up local uploaded file immediately after reading
                     try {
                         await fs.unlink(filePath);
-                        console.log(`🗑️ Cleaned up local file: ${filePath}`);
+                        console.log(`🗑️ Cleaned up temporary local file: ${filePath}`);
                     }
                     catch (unlinkError) {
-                        console.warn("Could not clean up local file:", unlinkError);
+                        console.warn("Could not clean up temporary file:", unlinkError);
                     }
                     res.json({
                         success: true,
@@ -149,19 +152,27 @@ export const certificateController = {
                     console.error("❌ Azure upload failed:", azureError);
                     // Fallback to local storage if Azure fails
                     console.log("🔄 Falling back to local storage...");
-                    const fallbackConfig = {
-                        ...templateConfig,
-                        file_path: filePath,
-                        uses_azure_storage: false,
-                    };
-                    // Save template to database with local storage
+                    // Save template to database with local storage - populate ALL columns
                     const { data, error } = await supabase
                         .from("certificate_templates")
                         .insert({
                         event_id: eventId || null, // Allow null for global templates
                         name,
-                        template: fallbackConfig,
-                        uses_azure_storage: false,
+                        type: type || "powerpoint", // Individual column
+                        template: {
+                            file_path: filePath,
+                            file_name: req.file.originalname,
+                            type: type || "powerpoint",
+                            placeholders: placeholders || [],
+                            placeholder_mapping: placeholderMapping || {},
+                            available_fields: AVAILABLE_DATA_FIELDS,
+                        }, // JSONB column with template configuration
+                        extracted_placeholders: placeholders || [], // Individual column
+                        placeholder_mapping: placeholderMapping || {}, // Individual column
+                        template_data: templateData || {}, // Individual column
+                        file_path: filePath, // Individual column for local file path
+                        uses_azure_storage: false, // Individual column for storage type
+                        azure_url: null, // Individual column - null for local storage
                     })
                         .select()
                         .single();
@@ -319,26 +330,27 @@ export const certificateController = {
                     const certificateData = CertificateGenerator.generateCertificateData(participant, eventData, certificateCode, serialNumber++);
                     let certificateBuffer;
                     let fileExtension;
-                    if (template.type === "powerpoint" && template.file_path) {
+                    if (template.type === "powerpoint" &&
+                        (template.file_path || template.uses_azure_storage)) {
+                        console.log(`🎯 Generating PowerPoint certificate using template ${templateId} (will convert to PDF)`);
                         certificateBuffer =
-                            await CertificateGenerator.generatePowerPointCertificate(template.file_path, certificateData, template.placeholder_mapping);
-                        fileExtension = "pptx";
+                            await CertificateGenerator.generatePowerPointCertificate(template.file_path || "", // Fallback path for legacy templates
+                            certificateData, template.placeholder_mapping, templateId // Pass template ID for Azure storage lookup
+                            );
+                        // Determine file extension based on buffer content (PDF conversion may fall back to PPTX)
+                        // Check if buffer starts with PDF signature %PDF
+                        const isPdf = certificateBuffer.subarray(0, 4).toString() === "%PDF";
+                        fileExtension = isPdf ? "pdf" : "pptx";
+                        console.log(`📄 Certificate generated as ${fileExtension.toUpperCase()}`);
                     }
                     else {
+                        console.log(`🎯 Generating Canvas certificate using template ${templateId}`);
                         certificateBuffer =
                             await CertificateGenerator.generateCanvasCertificate(certificateData, template.template_data);
                         fileExtension = "png";
                     }
                     // Save certificate
                     const certificateUrl = await CertificateGenerator.saveCertificate(participant.id, eventId, templateId, certificateBuffer, certificateCode, verificationCode, fileExtension);
-                    // console.log(
-                    //   `✅ Certificate generated successfully for ${participant.name}`,
-                    //   {
-                    //     certificateCode,
-                    //     verificationCode,
-                    //     certificateUrl,
-                    //   }
-                    // );
                     results.push({
                         participantId: participant.id,
                         participantName: participant.name,
@@ -724,6 +736,8 @@ export const certificateController = {
                 .from("certificates")
                 .select(`
           certificate_url,
+          azure_file_name,
+          uses_azure_storage,
           registrations!inner (
             name
           )
@@ -739,15 +753,62 @@ export const certificateController = {
             const registrationData = Array.isArray(data.registrations)
                 ? data.registrations[0]
                 : data.registrations;
-            // For now, just return the certificate URL
-            // In production, you might want to serve the actual file
-            res.json({
-                success: true,
-                data: {
-                    downloadUrl: data.certificate_url,
-                    fileName: `${registrationData?.name}_Certificate.png`,
-                },
-            });
+            try {
+                let certificateBuffer;
+                let fileName = `${registrationData?.name}_Certificate.png`;
+                if (data.uses_azure_storage && data.azure_file_name) {
+                    // Download from Azure Blob Storage
+                    console.log(`📥 Downloading certificate from Azure: ${data.azure_file_name}`);
+                    const { azureBlobService } = await import("../config/azure.js");
+                    certificateBuffer = await azureBlobService.downloadCertificate(data.azure_file_name);
+                    // Use Azure filename for proper extension
+                    const fileExtension = data.azure_file_name.split(".").pop();
+                    fileName = `${registrationData?.name}_Certificate.${fileExtension}`;
+                }
+                else if (data.certificate_url) {
+                    // Fallback: try to read from local path (for legacy certificates)
+                    console.log(`📁 Reading certificate from local path: ${data.certificate_url}`);
+                    certificateBuffer = await fs.readFile(data.certificate_url);
+                }
+                else {
+                    throw new Error("No certificate file found");
+                }
+                // Set appropriate content type based on file extension
+                const ext = fileName.toLowerCase().split(".").pop();
+                const contentType = ext === "png"
+                    ? "image/png"
+                    : ext === "jpg" || ext === "jpeg"
+                        ? "image/jpeg"
+                        : ext === "pdf"
+                            ? "application/pdf"
+                            : ext === "pptx"
+                                ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                : "application/octet-stream";
+                // Send the certificate file
+                res.setHeader("Content-Type", contentType);
+                res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+                res.send(certificateBuffer);
+            }
+            catch (fileError) {
+                console.error("Error reading certificate file:", fileError);
+                // If file reading fails, return the SAS URL for direct download
+                if (data.certificate_url) {
+                    res.json({
+                        success: true,
+                        data: {
+                            downloadUrl: data.certificate_url,
+                            fileName: `${registrationData?.name}_Certificate.png`,
+                            message: "Direct download link (certificate file not accessible from server)",
+                        },
+                    });
+                }
+                else {
+                    res.status(404).json({
+                        success: false,
+                        error: "Certificate file not accessible",
+                    });
+                }
+            }
         }
         catch (error) {
             console.error("Error downloading certificate:", error);

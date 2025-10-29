@@ -103,7 +103,13 @@ app.get("/uploads/certificates/:filename", async (req, res) => {
     const fileBuffer = await azureBlobService.downloadCertificate(filename);
 
     // Set appropriate headers based on file extension
-    const ext = filename.toLowerCase().split(".").pop();
+    // Handle compressed files by checking the original extension before .gz
+    let actualFilename = filename;
+    if (filename.endsWith(".gz")) {
+      actualFilename = filename.substring(0, filename.length - 3);
+    }
+
+    const ext = actualFilename.toLowerCase().split(".").pop();
     const contentType =
       ext === "png"
         ? "image/png"
@@ -114,7 +120,10 @@ app.get("/uploads/certificates/:filename", async (req, res) => {
         : "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${actualFilename}"`
+    );
     res.send(fileBuffer);
   } catch (error) {
     console.error(

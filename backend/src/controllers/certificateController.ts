@@ -412,7 +412,7 @@ export const certificateController = {
             (template.file_path || template.uses_azure_storage)
           ) {
             console.log(
-              `🎯 Generating PowerPoint certificate using template ${templateId}`
+              `🎯 Generating PowerPoint certificate using template ${templateId} (will convert to PDF)`
             );
             certificateBuffer =
               await CertificateGenerator.generatePowerPointCertificate(
@@ -421,7 +421,16 @@ export const certificateController = {
                 template.placeholder_mapping,
                 templateId // Pass template ID for Azure storage lookup
               );
-            fileExtension = "pptx";
+
+            // Determine file extension based on buffer content (PDF conversion may fall back to PPTX)
+            // Check if buffer starts with PDF signature %PDF
+            const isPdf =
+              certificateBuffer.subarray(0, 4).toString() === "%PDF";
+            fileExtension = isPdf ? "pdf" : "pptx";
+
+            console.log(
+              `📄 Certificate generated as ${fileExtension.toUpperCase()}`
+            );
           } else {
             console.log(
               `🎯 Generating Canvas certificate using template ${templateId}`
@@ -444,15 +453,6 @@ export const certificateController = {
             verificationCode,
             fileExtension
           );
-
-          // console.log(
-          //   `✅ Certificate generated successfully for ${participant.name}`,
-          //   {
-          //     certificateCode,
-          //     verificationCode,
-          //     certificateUrl,
-          //   }
-          // );
 
           results.push({
             participantId: participant.id,

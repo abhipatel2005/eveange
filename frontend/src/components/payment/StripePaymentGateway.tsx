@@ -9,7 +9,7 @@ import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
 import { Button } from "../ui/Button.tsx";
 import { LoadingSpinner } from "../ui/LoadingSpinner.tsx";
 import { PaymentService, PaymentIntent } from "../../api/payments.ts";
-import { handleError } from "../../utils/errorHandler.ts";
+import { handleErrorSimple as handleError } from "../../utils/errorHandling";
 
 interface StripePaymentGatewayProps {
   registrationId: string;

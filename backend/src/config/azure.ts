@@ -56,6 +56,7 @@ export class AzureBlobService {
     // Don't compress already compressed formats or small files
     if (
       ext === "pptx" ||
+      ext === "pdf" ||
       ext === "zip" ||
       ext === "jpg" ||
       ext === "jpeg" ||
@@ -142,10 +143,18 @@ export class AzureBlobService {
 
   async downloadCertificate(fileName: string): Promise<Buffer> {
     try {
+      console.log(
+        `🔍 Azure downloadCertificate called with fileName: ${fileName}`
+      );
+
       const containerClient = this.blobServiceClient.getContainerClient(
         this.containerName
       );
       const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+
+      console.log(
+        `📥 Attempting to download from Azure: ${blockBlobClient.url}`
+      );
 
       const downloadResponse = await blockBlobClient.download();
 
@@ -161,10 +170,17 @@ export class AzureBlobService {
         });
 
         downloadResponse.readableStreamBody!.on("end", () => {
-          resolve(Buffer.concat(chunks));
+          const finalBuffer = Buffer.concat(chunks);
+          console.log(
+            `✅ Azure download complete: ${finalBuffer.length} bytes`
+          );
+          resolve(finalBuffer);
         });
 
-        downloadResponse.readableStreamBody!.on("error", reject);
+        downloadResponse.readableStreamBody!.on("error", (error) => {
+          console.error(`❌ Azure download stream error:`, error);
+          reject(error);
+        });
       });
 
       // Check if file was compressed (has .gz extension or gzip content encoding)
