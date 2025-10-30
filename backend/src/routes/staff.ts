@@ -12,9 +12,10 @@ router.get("/test/:userId", async (req, res) => {
 
     // Simple query without joins first
     const { data: assignments, error } = await supabase
-      .from("staff_assignments")
+      .from("event_users")
       .select("*")
-      .eq("staff_id", userId);
+      .eq("user_id", userId)
+      .eq("role", "staff");
 
     console.log("📊 Raw assignments:", JSON.stringify(assignments, null, 2));
     console.log("❌ Assignment error:", error);
@@ -50,9 +51,10 @@ router.get(
 
       // Get staff assignments first, then fetch events separately
       const { data: assignments, error: assignmentError } = await supabase
-        .from("staff_assignments")
+        .from("event_users")
         .select("*")
-        .eq("staff_id", userId);
+        .eq("user_id", userId)
+        .eq("role", "staff");
 
       if (assignmentError) {
         console.error("❌ Error fetching staff assignments:", assignmentError);
@@ -153,7 +155,7 @@ router.get(
 
       // Check if staff has access to this event
       const { data: assignment, error: assignmentError } = await supabase
-        .from("staff_assignments")
+        .from("event_users")
         .select(
           `
           id,
@@ -171,8 +173,9 @@ router.get(
           )
         `
         )
-        .eq("staff_id", userId)
+        .eq("user_id", userId)
         .eq("event_id", eventId)
+        .eq("role", "staff")
         .single();
 
       if (assignmentError || !assignment) {

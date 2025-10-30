@@ -27,8 +27,6 @@ export class EventController {
   ): Promise<void> {
     try {
       const userId = req.user?.id;
-      const userRole = req.user?.role;
-
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -37,10 +35,23 @@ export class EventController {
         return;
       }
 
-      if (userRole !== "organizer" && userRole !== "admin") {
+      // Fetch user profile to check org/phone
+      const { data: userProfile, error: userProfileError } = await supabase
+        .from("users")
+        .select("id, organization_name, phone_number")
+        .eq("id", userId)
+        .single();
+      if (userProfileError || !userProfile) {
         res.status(403).json({
           success: false,
-          error: "Only organizers can create events",
+          error: "User profile not found",
+        });
+        return;
+      }
+      if (!userProfile.organization_name || !userProfile.phone_number) {
+        res.status(403).json({
+          success: false,
+          error: "Organization name and phone number required to create events",
         });
         return;
       }
@@ -85,6 +96,36 @@ export class EventController {
           error: "Failed to create event",
         });
         return;
+      }
+
+      // Add creator to event_users as organizer with full permissions
+      const defaultOrganizerPermissions = [
+        "manage-event",
+        "delete-event",
+        "view-registrations",
+        "manage-registrations",
+        "export-registrations",
+        "check-in",
+        "manage-staff",
+        "view-reports",
+        "manage-reports",
+        "send-emails",
+        "send-notifications",
+      ];
+
+      const { error: eventUserError } = await supabase
+        .from("event_users")
+        .insert({
+          event_id: event.id,
+          user_id: userId,
+          role: "organizer",
+          permissions: defaultOrganizerPermissions,
+          assigned_by: userId,
+          is_active: true,
+        });
+      if (eventUserError) {
+        console.error("Failed to add creator to event_users:", eventUserError);
+        // Optionally: return error or continue
       }
 
       res.status(201).json({

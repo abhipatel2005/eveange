@@ -44,14 +44,13 @@ export class UserController {
             const { data: updatedUser, error: updateError } = await supabase
                 .from("users")
                 .update({
-                role: "organizer",
-                organization_name: validatedData.organizationName,
-                phone_number: validatedData.phoneNumber,
-                description: validatedData.description,
-                updated_at: new Date().toISOString(),
-            })
+                    role: "organizer",
+                    organization_name: validatedData.organizationName,
+                    phone_number: validatedData.phoneNumber,
+                    updated_at: new Date().toISOString(),
+                })
                 .eq("id", userId)
-                .select("id, email, name, role, organization_name, phone_number, description, created_at")
+                .select("id, email, name, role, organization_name, phone_number, created_at")
                 .single();
             if (updateError) {
                 console.error("Database error:", updateError);

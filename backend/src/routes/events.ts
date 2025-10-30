@@ -12,7 +12,7 @@ router.get("/:id", EventController.getEventById);
 router.use(authenticateToken);
 
 // Organizer routes
-router.post("/", requireOrganizer, EventController.createEvent);
+router.post("/", EventController.createEvent);
 router.put("/:id", requireOrganizer, EventController.updateEvent);
 router.delete("/:id", requireOrganizer, EventController.deleteEvent);
 router.get("/my/events", EventController.getMyEvents);

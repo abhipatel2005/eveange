@@ -1132,23 +1132,23 @@ export class EmailService {
           contentType: contentType,
         };
 
-        console.log(
-          `✅ Certificate attachment created: ${
-            certificateAttachment.filename
-          } (${certificateBuffer.length} bytes, ${fileExtension.toUpperCase()})`
-        );
+        // console.log(
+        //   `✅ Certificate attachment created: ${
+        //     certificateAttachment.filename
+        //   } (${certificateBuffer.length} bytes, ${fileExtension.toUpperCase()})`
+        // );
       } catch (downloadError) {
         console.error(
           "❌ Failed to download certificate for attachment:",
           downloadError
         );
-        console.error("❌ Download error details:", {
-          certificateUrl,
-          error:
-            downloadError instanceof Error
-              ? downloadError.message
-              : String(downloadError),
-        });
+        // console.error("❌ Download error details:", {
+        //   certificateUrl,
+        //   error:
+        //     downloadError instanceof Error
+        //       ? downloadError.message
+        //       : String(downloadError),
+        // });
         // Continue without attachment
       }
     } else {
@@ -1269,91 +1269,251 @@ export class EmailService {
   ): string {
     return `
       <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your Certificate - ${eventTitle}</title>
-      </head>
-      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa;">
-        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-          
-          <!-- Header -->
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 700;">🎉 Congratulations!</h1>
-            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 18px;">Your certificate is ready</p>
-          </div>
-          
-          <!-- Main Content -->
-          <div style="padding: 40px 30px;">
-            <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 24px;">Hello ${participantName},</h2>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Your Certificate - ${eventTitle}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #e8f4f8;">
+      
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e8f4f8; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="background: white; border-radius: 20px; overflow: hidden; max-width: 600px;">
+              
+              <!-- Illustration Header -->
+              <tr>
+                <td style="padding: 60px 40px 40px; text-align: center; background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);">
+                  <svg width="200" height="200" viewBox="0 0 200 200" style="margin-bottom: 20px;">
+                    <!-- Certificate illustration -->
+                    <ellipse cx="100" cy="140" rx="80" ry="12" fill="#fef08a" opacity="0.5"/>
+                    <rect x="50" y="60" width="100" height="130" rx="4" fill="#1e293b" transform="rotate(-8 100 125)"/>
+                    <rect x="55" y="65" width="90" height="120" rx="2" fill="#f8fafc" transform="rotate(-8 100 125)"/>
+                    <line x1="65" y1="85" x2="135" y2="75" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="65" y1="100" x2="120" y2="93" stroke="#cbd5e1" stroke-width="2"/>
+                    <line x1="65" y1="110" x2="130" y2="102" stroke="#cbd5e1" stroke-width="2"/>
+                    <circle cx="100" cy="140" r="12" fill="#fbbf24"/>
+                    <path d="M 95 140 L 98 143 L 105 136" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Floating decorative elements -->
+                    <circle cx="30" cy="40" r="4" fill="#cbd5e1" opacity="0.6"/>
+                    <circle cx="170" cy="50" r="3" fill="#cbd5e1" opacity="0.6"/>
+                    <rect x="160" y="120" width="8" height="8" fill="#fbbf24" opacity="0.4" transform="rotate(45 164 124)"/>
+                  </svg>
+                  
+                  <h1 style="color: #1e293b; margin: 0 0 12px; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">Congratulations, ${participantName}!</h1>
+                  <p style="color: #64748b; margin: 0; font-size: 16px; line-height: 1.6;">Your certificate is ready to download</p>
+                </td>
+              </tr>
+              
+              <!-- Main Content -->
+              <tr>
+                <td style="padding: 40px 40px 50px;">
+                  
+                  <p style="color: #475569; line-height: 1.7; font-size: 16px; margin: 0 0 30px;">
+                    ${
+                      customMessage ||
+                      `Thank you for participating in <strong style="color: #1e293b;">${eventTitle}</strong>. We're excited to share your official certificate of completion. This recognizes your commitment and the valuable time you dedicated to this event.`
+                    }
+                  </p>
+                  
+                  <!-- Certificate Info Box -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f8fafc; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0;">
+                    <tr>
+                      <td style="padding: 28px;">
+                        <h3 style="color: #1e293b; margin: 0 0 20px; font-size: 18px; font-weight: 600;">Certificate Details</h3>
+                        
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="padding-bottom: 14px;">
+                              <span style="display: block; color: #64748b; font-size: 13px; margin-bottom: 4px;">Event Name</span>
+                              <span style="color: #1e293b; font-size: 15px; font-weight: 500;">${eventTitle}</span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding-bottom: 14px;">
+                              <span style="display: block; color: #64748b; font-size: 13px; margin-bottom: 6px;">Certificate ID</span>
+                              <span style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 8px 12px; border-radius: 6px; font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; display: inline-block;">${certificateCode}</span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <span style="display: block; color: #64748b; font-size: 13px; margin-bottom: 6px;">Verification Code</span>
+                              <span style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 8px 12px; border-radius: 6px; font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; display: inline-block;">${verificationCode}</span>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <!-- Download Notice -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #fef9c3; border-radius: 10px; margin-bottom: 30px; border-left: 3px solid #fbbf24;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="color: #713f12; margin: 0; font-size: 14px; line-height: 1.6;">
+                          <strong style="font-weight: 600;">📎 Your certificate is attached to this email</strong><br>
+                          Download and save it within 30 days. After that, you can request a new copy from your dashboard.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <!-- Simple tips -->
+                  <div style="margin-bottom: 32px;">
+                    <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 10px;">
+                      <strong style="color: #1e293b;">Keep your verification code safe</strong> — it proves your certificate is authentic and can be used to verify it anytime.
+                    </p>
+                    <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0;">
+                      You can verify your certificate or request support by visiting our platform and using your certificate ID.
+                    </p>
+                  </div>
+                  
+                  <!-- CTA Button -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 35px;">
+                    <tr>
+                      <td align="center">
+                        <a href="#" style="display: inline-block; background: #fbbf24; color: #1e293b; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                          Verify Certificate
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <!-- Closing -->
+                  <div style="border-top: 1px solid #e2e8f0; padding-top: 28px;">
+                    <p style="color: #475569; margin: 0 0 6px; font-size: 15px; line-height: 1.6;">
+                      Thanks again for being part of this event.
+                    </p>
+                    <p style="color: #1e293b; margin: 0; font-size: 15px; font-weight: 600;">
+                      The Event Team
+                    </p>
+                  </div>
+                  
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background: #f8fafc; padding: 30px 40px; border-top: 1px solid #e2e8f0;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <p style="color: #64748b; margin: 0 0 14px; font-size: 13px;">
+                          Questions? Reach out at <a href="mailto:support@yourplatform.com" style="color: #1e40af; text-decoration: none;">support@yourplatform.com</a>
+                        </p>
+                        
+                        <!-- Social Icons -->
+                        <div style="margin-bottom: 18px;">
+                          <a href="#" style="display: inline-block; margin: 0 6px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#64748b">
+                              <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/>
+                            </svg>
+                          </a>
+                          <a href="#" style="display: inline-block; margin: 0 6px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#64748b">
+                              <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
+                            </svg>
+                          </a>
+                          <a href="#" style="display: inline-block; margin: 0 6px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#64748b">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path fill="white" d="M12.5 7.5h-1v5l4.5 2.5.5-.8-4-2.3V7.5z"/>
+                            </svg>
+                          </a>
+                        </div>
+                        
+                        <p style="color: #94a3b8; margin: 0 0 8px; font-size: 12px;">
+                          Your Company Name, 123 Business St, City, Country
+                        </p>
+                        <p style="color: #94a3b8; margin: 0; font-size: 12px;">
+                          © 2025 All rights reserved
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+            </table>
             
-            <p style="color: #5a6c7d; line-height: 1.7; font-size: 16px; margin-bottom: 30px;">
-              ${
-                customMessage ||
-                `Congratulations on successfully completing "${eventTitle}"! We're pleased to present you with your official certificate of completion.`
-              }
+            <!-- Bottom text -->
+            <p style="color: #94a3b8; margin: 24px 0 0; font-size: 12px; text-align: center; line-height: 1.5;">
+              This is an automated email. Please don't reply directly to this message.<br>
+              If you didn't participate in this event, please contact us immediately.
             </p>
             
-            <!-- Certificate Details Card -->
-            <div style="background: #f8f9fa; border-radius: 10px; padding: 30px; margin-bottom: 30px; border-left: 4px solid #667eea;">
-              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">📜 Certificate Details</h3>
-              
-              <div style="margin-bottom: 15px;">
-                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Event:</div>
-                <span style="color: #2c3e50; font-weight: 500;">${eventTitle}</span>
-              </div>
-              
-              <div style="margin-bottom: 15px;">
-                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Certificate ID:</div>
-                <code style="background: #e9ecef; padding: 6px 10px; border-radius: 4px; color: #495057; font-family: 'Courier New', monospace; font-size: 14px;">${certificateCode}</code>
-              </div>
-              
-              <div style="margin-bottom: 0;">
-                <div style="display: inline-block; width: 140px; color: #5a6c7d; font-weight: 600;">Verification:</div>
-                <code style="background: #e9ecef; padding: 6px 10px; border-radius: 4px; color: #495057; font-family: 'Courier New', monospace; font-size: 14px;">${verificationCode}</code>
-              </div>
-            </div>
-            
-            <!-- Important Notes -->
-            <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 25px; margin-bottom: 30px;">
-              <h4 style="color: #155724; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📋 Important Information</h4>
-              <ul style="color: #155724; margin: 0; padding-left: 20px; line-height: 1.6;">
-                <li>Keep your verification code secure - it proves your certificate's authenticity</li>
-                <li>This certificate is digitally signed and tamper-proof</li>
-                <li>You can verify your certificate using the verification code on our platform</li>
-                <li>For any questions, please contact our support team</li>
-              </ul>
-            </div>
-            
-            <!-- Certificate Download -->
-            <div style="text-align: center; margin-bottom: 30px;">
-              <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px;">
-                <p style="color: #856404; margin: 0; font-size: 14px;">
-                  📎 <strong>Certificate Attachment:</strong> Your certificate is attached to this email You can download them within in the span of 30 days.
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Footer -->
-          <div style="background: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef;">
-            <p style="color: #6c757d; margin: 0 0 10px 0; font-size: 14px;">Thank you for participating in our event!</p>
-            <p style="color: #6c757d; margin: 0; font-size: 14px;">
-              Best regards,<br>
-              <strong style="color: #495057;">Event Management Team</strong>
-            </p>
-          </div>
-          
-        </div>
-        
-        <!-- Footer Note -->
-        <div style="text-align: center; padding: 20px; color: #adb5bd; font-size: 12px;">
-          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
-        </div>
-      </body>
-      </html>
+          </td>
+        </tr>
+      </table>
+      
+    </body>
+    </html>
     `;
+  }
+
+  // Send notification to existing user when assigned as staff for a new event
+  static async sendStaffAssignmentNotification(
+    email: string,
+    name: string,
+    eventTitle: string,
+    loginUrl: string
+  ) {
+    const subject = `You have been added as staff for the event: ${eventTitle}`;
+    const html = `
+      <p>Hi ${name},</p>
+      <p>You have been added as a staff member for the event <strong>${eventTitle}</strong>.</p>
+      <p>You can log in and view your event dashboard here: <a href="${loginUrl}">${loginUrl}</a></p>
+      <p>If you have any questions, please contact the event organizer.</p>
+      <p>Best regards,<br/>Event Management Team</p>
+    `;
+
+    try {
+      // First try SMTP approach
+      const transporter = await getTransporter();
+
+      await transporter.sendMail({
+        from: process.env.FROM_EMAIL || "noreply@eventplatform.com",
+        to: email,
+        subject,
+        html,
+      });
+
+      console.log(
+        `✅ Staff assignment notification sent successfully via SMTP to ${email}`
+      );
+      return true;
+    } catch (smtpError) {
+      console.warn(
+        "⚠️ SMTP email sending failed, trying Gmail API as fallback:",
+        smtpError
+      );
+
+      // Try Gmail API as fallback
+      if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+        try {
+          await sendEmailViaGmailAPI(
+            process.env.GMAIL_USER,
+            process.env.GMAIL_APP_PASSWORD,
+            "",
+            email,
+            subject,
+            html
+          );
+
+          console.log(
+            `✅ Staff assignment notification sent successfully via Gmail API to ${email}`
+          );
+          return true;
+        } catch (gmailError) {
+          console.error("❌ Gmail API email sending also failed:", gmailError);
+          return false;
+        }
+      } else {
+        console.error("❌ No Gmail API credentials provided for fallback");
+        return false;
+      }
+    }
   }
 }
 

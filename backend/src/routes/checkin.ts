@@ -81,24 +81,37 @@ router.post(
       console.log("✅ Event found:", event.title);
 
       // Check if staff member already exists
-      console.log("👤 Checking if user exists...");
+      console.log("👤 Checking if user exists (admin)...");
       let staffUser;
-      const { data: existingUser } = await supabase
+      const { data: existingUser } = await supabaseAdmin
         .from("users")
         .select("*")
         .eq("email", email)
         .single();
 
-      console.log("👤 Existing user check result:", existingUser);
+      console.log("👤 Existing user check result (admin):", existingUser);
 
       if (existingUser) {
+        // Send notification email to existing user
+        try {
+          await EmailService.sendStaffAssignmentNotification(
+            email,
+            name,
+            event.title,
+            `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`
+          );
+          console.log(`✅ Staff assignment notification sent to: ${email}`);
+        } catch (notifyError) {
+          console.error("📧 Notification email sending failed:", notifyError);
+        }
         // User exists, check if already assigned to this event
         console.log("🔍 User exists, checking assignment...");
-        const { data: existingAssignment } = await supabase
-          .from("staff_assignments")
+        const { data: existingAssignment } = await supabaseAdmin
+          .from("event_users")
           .select("*")
-          .eq("staff_id", existingUser.id)
+          .eq("user_id", existingUser.id)
           .eq("event_id", eventId)
+          .eq("role", "staff")
           .single();
 
         console.log("📋 Assignment check result:", existingAssignment);
@@ -112,6 +125,8 @@ router.post(
 
         staffUser = existingUser;
         console.log("✅ Using existing user");
+        // Do NOT attempt to create a new user if one already exists!
+        // Proceed to event_users insert only.
       } else {
         // Create new user for staff member
         console.log("🔨 Creating new user...");
@@ -132,11 +147,35 @@ router.post(
         console.log("👤 User creation result:", { newUser, userError });
 
         if (userError || !newUser) {
-          console.log("❌ User creation failed");
-          return res.status(400).json({
-            error: "Failed to create staff user",
-            details: userError?.message,
-          });
+          // If duplicate email error, fetch the user from supabaseAdmin and proceed
+          if (userError && userError.code === "23505") {
+            console.log(
+              "⚠️ User already exists (duplicate email), fetching existing user from supabaseAdmin..."
+            );
+            const { data: adminExistingUser, error: adminUserFetchError } =
+              await supabaseAdmin
+                .from("users")
+                .select("*")
+                .eq("email", email)
+                .single();
+            if (!adminExistingUser || adminUserFetchError) {
+              console.log(
+                "❌ Could not fetch existing user after duplicate error"
+              );
+              return res.status(400).json({
+                error: "Failed to create or fetch staff user",
+                details: userError?.message,
+              });
+            }
+            staffUser = adminExistingUser;
+            // Optionally: send notification email if needed
+          } else {
+            console.log("❌ User creation failed");
+            return res.status(400).json({
+              error: "Failed to create staff user",
+              details: userError?.message,
+            });
+          }
         }
 
         staffUser = newUser;
@@ -186,10 +225,11 @@ router.post(
       // Create staff assignment
       // Permissions are already in array format from frontend
       const { data: assignment, error: assignmentError } = await supabaseAdmin
-        .from("staff_assignments")
+        .from("event_users")
         .insert({
-          staff_id: staffUser.id,
+          user_id: staffUser.id,
           event_id: eventId,
+          role: "staff",
           assigned_by: userId,
           permissions: permissions,
         })
@@ -254,8 +294,6 @@ router.get(
         .eq("id", userId)
         .single();
 
-      console.log("👤 User role lookup:", { user, userError });
-
       const isOrganizer = event.organizer_id === userId;
       const isAdmin = user?.role === "admin";
 
@@ -276,18 +314,19 @@ router.get(
 
       // Fetch staff assignments with user details
       const { data: staffAssignments, error: staffError } = await supabaseAdmin
-        .from("staff_assignments")
+        .from("event_users")
         .select(
           `
           id,
           permissions,
           created_at,
           assigned_by,
-          staff_id,
+          user_id,
           event_id
         `
         )
         .eq("event_id", eventId)
+        .eq("role", "staff")
         .order("created_at", { ascending: false });
 
       console.log("🔍 Staff assignments raw data:", staffAssignments);
@@ -306,7 +345,7 @@ router.get(
         const { data: staffUser } = await supabaseAdmin
           .from("users")
           .select("id, name, email, last_login_at")
-          .eq("id", assignment.staff_id)
+          .eq("id", assignment.user_id)
           .single();
 
         // Fetch assigned_by user details
@@ -390,10 +429,11 @@ router.get(
         console.log("🔍 Checking staff access...");
         // Check if user is staff for this event - remove is_active constraint
         const { data: staffAccess, error: staffError } = await supabase
-          .from("staff_assignments")
+          .from("event_users")
           .select("id, permissions")
-          .eq("staff_id", userId)
+          .eq("user_id", userId)
           .eq("event_id", eventId)
+          .eq("role", "staff")
           .single();
 
         // console.log("👷 Staff access result:", { staffAccess, staffError });
@@ -553,10 +593,11 @@ router.post(
       if (!isOrganizer) {
         // Check if user is staff for this event
         const { data: staffAccess } = await supabaseAdmin
-          .from("staff_assignments")
+          .from("event_users")
           .select("id, permissions")
-          .eq("staff_id", userId)
+          .eq("user_id", userId)
           .eq("event_id", eventId)
+          .eq("role", "staff")
           .eq("is_active", true)
           .single();
 

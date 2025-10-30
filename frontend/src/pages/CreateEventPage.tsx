@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { EventService } from "../api/events";
 import { useAuth } from "../hooks/useAuth";
+import { UserService } from "../api/user";
 import MapLocationPicker from "../components/ui/MapLocationPicker";
 import { OrganizerUpgradeModal } from "../components/modals/OrganizerUpgradeModal";
 
@@ -28,7 +29,9 @@ type CreateEventFormData = z.infer<typeof CreateEventFormSchema>;
 
 const CreateEventPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isOrganizer } = useAuth();
+  const { user, updateUser } = useAuth();
+  // Allow all users, but require org name and phone number
+  const needsProfileInfo = !user?.organizationName || !user?.phoneNumber;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -42,12 +45,28 @@ const CreateEventPage: React.FC = () => {
     | undefined
   >(undefined);
 
-  // Check if user needs to upgrade when component mounts
+  // Show modal if user missing org/phone
   useEffect(() => {
-    if (user && user.role === "participant") {
+    if (user && needsProfileInfo) {
       setShowUpgradeModal(true);
+    } else {
+      setShowUpgradeModal(false);
     }
-  }, [user]);
+  }, [user, needsProfileInfo]);
+
+  // Fetch latest user profile after successful upgrade
+  const handleUpgradeSuccess = async () => {
+    try {
+      const response = await UserService.getProfile();
+      if (response.success && response.data) {
+        updateUser(response.data.user);
+      }
+    } catch (err) {
+      // ignore
+    } finally {
+      setShowUpgradeModal(false);
+    }
+  };
 
   const {
     register,
@@ -132,8 +151,8 @@ const CreateEventPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Show form only if user is organizer and upgrade modal is not showing */}
-      {!showUpgradeModal && isOrganizer && (
+      {/* Show form only if user has org/phone and modal is not showing */}
+      {!showUpgradeModal && !needsProfileInfo && (
         <>
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -436,10 +455,7 @@ const CreateEventPage: React.FC = () => {
       <OrganizerUpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        onSuccess={() => {
-          setShowUpgradeModal(false);
-          // User can now access the form as an organizer
-        }}
+        onSuccess={handleUpgradeSuccess}
       />
     </div>
   );

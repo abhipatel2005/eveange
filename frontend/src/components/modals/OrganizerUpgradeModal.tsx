@@ -46,14 +46,21 @@ export const OrganizerUpgradeModal = ({
       const upgradeData: OrganizerUpgradeData = {
         organizationName: data.organizationName,
         phoneNumber: data.phoneNumber || undefined,
-        description: data.description || undefined,
       };
 
       const response = await UserService.upgradeToOrganizer(upgradeData);
 
       if (response.success && response.data) {
-        // Update user in auth store
-        updateUser(response.data.user);
+        // Normalize backend user keys to camelCase for auth store
+        const backendUser = response.data.user;
+        const b = backendUser as any;
+        const normalizedUser = {
+          ...backendUser,
+          organizationName:
+            backendUser.organizationName || b.organization_name || "",
+          phoneNumber: backendUser.phoneNumber || b.phone_number || "",
+        };
+        updateUser(normalizedUser);
 
         toast.success("Successfully upgraded to organizer!");
         reset();
@@ -145,28 +152,6 @@ export const OrganizerUpgradeModal = ({
               {errors.phoneNumber && (
                 <p className="mt-1 text-sm text-red-600">
                   {errors.phoneNumber.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Organization Description (Optional)
-              </label>
-              <textarea
-                {...register("description")}
-                id="description"
-                rows={3}
-                className="input resize-none"
-                placeholder="Brief description of your organization"
-                disabled={isSubmitting}
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.description.message}
                 </p>
               )}
             </div>

@@ -10,6 +10,7 @@ export interface User {
   phoneNumber?: string;
   createdAt?: string;
   lastLoginAt?: string;
+  canCreateEvent?: boolean;
 }
 
 interface AuthState {
