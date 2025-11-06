@@ -699,7 +699,7 @@ export class EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to EventBase!</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to eveange!</h1>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -766,9 +766,7 @@ export class EmailService {
 
       // Send email
       const mailOptions = {
-        from: `"EventBase" <${
-          process.env.FROM_EMAIL || process.env.GMAIL_USER
-        }>`,
+        from: `"eveange" <${process.env.FROM_EMAIL || process.env.GMAIL_USER}>`,
         to: email,
         subject: "Verify Your Email Address",
         html: htmlContent,

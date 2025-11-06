@@ -73,14 +73,14 @@ class SMSService {
             const { data, error } = await supabaseAdmin
                 .from("phone_verifications")
                 .upsert({
-                user_id: userId,
-                phone_number: formattedPhone,
-                otp_code: otpCode,
-                expires_at: expiresAt.toISOString(),
-                created_at: new Date().toISOString(),
-                attempts: 0,
-                is_verified: false,
-            })
+                    user_id: userId,
+                    phone_number: formattedPhone,
+                    otp_code: otpCode,
+                    expires_at: expiresAt.toISOString(),
+                    created_at: new Date().toISOString(),
+                    attempts: 0,
+                    is_verified: false,
+                })
                 .select("*");
             if (error) {
                 console.error("❌ Database error storing OTP:", error);
@@ -117,8 +117,8 @@ class SMSService {
             const formattedPhone = this.formatPhoneNumber(phoneNumber);
             // Free trial friendly message
             const message = userName
-                ? `Hi ${userName}! Your EventBase verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`
-                : `Your EventBase verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`;
+                ? `Hi ${userName}! Your eveange verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`
+                : `Your evenage verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`;
             console.log("📱 Sending SMS...");
             console.log("📱 To:", formattedPhone);
             console.log("📱 Message length:", message.length);
@@ -240,19 +240,19 @@ class SMSService {
             await supabaseAdmin
                 .from("phone_verifications")
                 .update({
-                is_verified: true,
-                verified_at: new Date().toISOString(),
-            })
+                    is_verified: true,
+                    verified_at: new Date().toISOString(),
+                })
                 .eq("id", record.id);
             // Update user's phone verification status
             await supabaseAdmin
                 .from("users")
                 .update({
-                phone_number: formattedPhone,
-                phone_verified: true,
-                phone_verified_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
+                    phone_number: formattedPhone,
+                    phone_verified: true,
+                    phone_verified_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
                 .eq("id", record.user_id);
             console.log("✅ Phone verification completed successfully!");
             return {

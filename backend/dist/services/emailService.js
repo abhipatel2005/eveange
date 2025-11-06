@@ -485,11 +485,11 @@ export class EmailService {
         const { data: insertedData, error } = await supabaseAdmin
             .from("email_verifications")
             .upsert({
-            user_id: userId,
-            token,
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString(),
-        })
+                user_id: userId,
+                token,
+                expires_at: expiresAt.toISOString(),
+                created_at: new Date().toISOString(),
+            })
             .select("*");
         if (error) {
             console.error("❌ Database error storing verification token:", error);
@@ -521,7 +521,7 @@ export class EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to EventBase!</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to eveange!</h1>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -581,7 +581,7 @@ export class EmailService {
             console.log("✅ SMTP configuration verified successfully");
             // Send email
             const mailOptions = {
-                from: `"EventBase" <${process.env.FROM_EMAIL || process.env.GMAIL_USER}>`,
+                from: `"eveange" <${process.env.FROM_EMAIL || process.env.GMAIL_USER}>`,
                 to: email,
                 subject: "Verify Your Email Address",
                 html: htmlContent,
@@ -716,10 +716,10 @@ export class EmailService {
             const { data: updatedUser, error: updateError } = await supabaseAdmin
                 .from("users")
                 .update({
-                email_verified: true,
-                email_verified_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
+                    email_verified: true,
+                    email_verified_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
                 .eq("id", verificationRecord.user_id)
                 .select("id, email, email_verified, email_verified_at")
                 .single();
@@ -764,9 +764,9 @@ export class EmailService {
             await supabaseAdmin
                 .from("email_verifications")
                 .update({
-                is_used: true,
-                verified_at: new Date().toISOString(),
-            })
+                    is_used: true,
+                    verified_at: new Date().toISOString(),
+                })
                 .eq("token", token);
             console.log("✅ Email verification completed successfully!");
             return { success: true, userId: verificationRecord.user_id };

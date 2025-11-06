@@ -139,8 +139,8 @@ class SMSService {
 
       // Free trial friendly message
       const message = userName
-        ? `Hi ${userName}! Your EventBase verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`
-        : `Your EventBase verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`;
+        ? `Hi ${userName}! Your eveange verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`
+        : `Your eveange verification code is: ${otpCode}. Valid for 5 minutes. (Sent from trial account)`;
 
       console.log("📱 Sending SMS...");
       console.log("📱 To:", formattedPhone);

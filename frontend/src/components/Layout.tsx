@@ -12,6 +12,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useUserPermissions } from "../hooks/useUserPermissions";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,6 +22,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const { user, isAuthenticated, logout } = useAuth();
+  const { permissions } = useUserPermissions();
+  
+  // For dynamic nav: get event/registration/staff state from DashboardPage logic
+  // We'll use localStorage (populated by dashboard) as a simple cross-component comms for now
+  const [hasRegistrations, setHasRegistrations] = React.useState(false);
+  
+  React.useEffect(() => {
+    // Listen for dashboard updates (set in DashboardPage)
+    const reg = localStorage.getItem("dashboard_has_registrations");
+    setHasRegistrations(reg === "true");
+    // Listen for changes
+    const handler = () => {
+      setHasRegistrations(
+        localStorage.getItem("dashboard_has_registrations") === "true"
+      );
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // Base navigation items (always visible)
   const publicNavigation = [{ name: "Events", href: "/events", icon: Users }];
@@ -30,9 +50,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: "Dashboard", href: "/dashboard", icon: CalendarDays },
   ];
 
-  // Add My Registrations for participants
-  const registrationNav =
-    user?.role === "participant"
+  // Show QR Scanner and Certificates based on event_users table permissions
+  const canSeeQRScanner =
+    user?.role === "organizer" ||
+    user?.role === "admin" ||
+    permissions?.hasStaffAssignments ||
+    permissions?.canScanQR;
+    
+  const canAccessCertificates =
+    user?.role === "organizer" ||
+    user?.role === "admin" ||
+    permissions?.canAccessCertificates;
+
+  const authenticatedNavigation = [
+    ...baseNavigation,
+    ...(hasRegistrations
       ? [
           {
             name: "My Registrations",
@@ -40,21 +72,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             icon: UserCheck,
           },
         ]
-      : [];
-
-  // QR Scanner and other organizer/admin tools
-  const organizerNavigation =
-    user?.role === "organizer" || user?.role === "admin"
-      ? [
-          { name: "QR Scanner", href: "/scanner", icon: QrCode },
-          { name: "Certificates", href: "/certificates", icon: Award },
-        ]
-      : [];
-
-  const authenticatedNavigation = [
-    ...baseNavigation,
-    ...registrationNav,
-    ...organizerNavigation,
+      : []),
+    ...(canSeeQRScanner
+      ? [{ name: "QR Scanner", href: "/scanner", icon: QrCode }]
+      : []),
+    ...(canAccessCertificates
+      ? [{ name: "Certificates", href: "/certificates", icon: Award }]
+      : []),
   ];
 
   const navigation = isAuthenticated
@@ -77,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <p className="text-2xl font-bold text-primary-600">eventbase</p>
+                <p className="text-2xl font-bold text-primary-600">eveange</p>
               </div>
 
               {/* Desktop Navigation */}
@@ -130,6 +154,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               ) : (
                 <div className="flex items-center space-x-4">
                   {/* Create Event Button */}
+                  {/* Show Create Event for all authenticated users */}
                   <Link
                     to="/events/create"
                     className="btn btn-primary text-sm px-4 py-2"
@@ -227,6 +252,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             ) : (
               <div className="pt-4 pb-3 border-t border-gray-200">
                 {/* Create Event Button for Mobile */}
+                {/* Show Create Event for all authenticated users */}
                 <div className="px-4 mb-3">
                   <Link
                     to="/events/create"
@@ -259,7 +285,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-500">
             <p>
-              &copy; {new Date().getFullYear()} eventbase. All rights reserved.
+              &copy; {new Date().getFullYear()} eveange. All rights reserved.
             </p>
           </div>
         </div>

@@ -94,7 +94,7 @@ function App() {
         <Route
           path="/certificates"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute requireOrganizer allowStaff>
               <CertificatesListPage />
             </ProtectedRoute>
           }
@@ -144,7 +144,7 @@ function App() {
         <Route
           path="/scanner"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute requireOrganizer allowStaff>
               <QRScannerPage />
             </ProtectedRoute>
           }

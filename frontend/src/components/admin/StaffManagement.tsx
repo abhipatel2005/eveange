@@ -14,6 +14,7 @@ interface Staff {
   permissions: {
     can_check_in: boolean;
     can_view_stats: boolean;
+    can_create_certificate?: boolean;
   };
   assigned_at: string;
   user: {
@@ -47,6 +48,7 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
     permissions: {
       can_check_in: true,
       can_view_stats: true,
+      can_create_certificate: false,
     },
   });
 
@@ -169,6 +171,9 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
       if (newStaff.permissions.can_view_stats) {
         permissionsArray.push("view-stats");
       }
+      if (newStaff.permissions.can_create_certificate) {
+        permissionsArray.push("create-certificate");
+      }
 
       const staffData = {
         email: newStaff.email,
@@ -193,6 +198,7 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
           permissions: {
             can_check_in: true,
             can_view_stats: true,
+            can_create_certificate: false,
           },
         });
         setShowAddForm(false);
@@ -453,6 +459,25 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
                     Can view check-in statistics
                   </span>
                 </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={newStaff.permissions.can_create_certificate}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        permissions: {
+                          ...newStaff.permissions,
+                          can_create_certificate: e.target.checked,
+                        },
+                      })
+                    }
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Can manage certificates
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -549,6 +574,11 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
                         Stats
                       </span>
                     )}
+                    {member.permissions.can_create_certificate ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Certificates
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Last Login */}
@@ -632,6 +662,11 @@ export function StaffManagement({ eventId }: StaffManagementProps) {
                                 Stats
                               </span>
                             )}
+                            {member.permissions.can_create_certificate ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                Certificates
+                              </span>
+                            ) : null}
                           </div>
                         </div>
 

@@ -14,4 +14,7 @@ router.post(
 // GET /api/users/profile - Protected route
 router.get("/profile", authenticateToken, UserController.getProfile);
 
+// GET /api/users/permissions - Protected route
+router.get("/permissions", authenticateToken, UserController.getPermissions);
+
 export default router;

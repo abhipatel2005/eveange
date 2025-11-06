@@ -214,15 +214,17 @@ export class EventController {
         console.error("Get events error:", error);
         res.status(500).json({
           success: false,
-          error: "Failed to fetch events",
+          error:
+            "Failed to fetch events. Please check your database connection.",
         });
         return;
       }
 
+      // Return success even with no events, with a helpful message
       res.json({
         success: true,
         data: {
-          events,
+          events: events || [],
           pagination: {
             page: Number(page),
             limit: Number(limit),
@@ -230,12 +232,33 @@ export class EventController {
             pages: Math.ceil((count || 0) / Number(limit)),
           },
         },
+        message:
+          !events || events.length === 0
+            ? upcoming === "true"
+              ? "No upcoming events found"
+              : "No events found"
+            : undefined,
       });
-    } catch (error) {
-      console.error("Get events error:", error);
+    } catch (error: any) {
+      console.error("Get events error:", {
+        message: error?.message,
+        details: error?.stack,
+        hint: error?.hint || "",
+        code: error?.code || "",
+      });
+
+      // Provide more specific error messages
+      let errorMessage = "Internal server error";
+      if (error?.message?.includes("fetch failed")) {
+        errorMessage =
+          "Unable to connect to database. Please check your network connection and database configuration.";
+      } else if (error?.code === "PGRST116") {
+        errorMessage = "Database query error. Please contact support.";
+      }
+
       res.status(500).json({
         success: false,
-        error: "Internal server error",
+        error: errorMessage,
       });
     }
   }

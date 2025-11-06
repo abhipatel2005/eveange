@@ -128,4 +128,73 @@ export class UserController {
       });
     }
   }
+
+  /**
+   * Get user permissions from event_users table
+   * GET /api/users/permissions
+   */
+  static async getPermissions(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: "User not authenticated",
+        });
+        return;
+      }
+
+      // Get all event_users entries for this user
+      const { data: eventUsers, error } = await supabase
+        .from("event_users")
+        .select("event_id, role, permissions, is_active")
+        .eq("user_id", userId)
+        .eq("is_active", true);
+
+      if (error) {
+        console.error("Get permissions error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch permissions",
+        });
+        return;
+      }
+
+      // Determine what the user can access
+      const hasStaffAssignments = eventUsers && eventUsers.length > 0;
+      const canAccessCertificates = eventUsers?.some(
+        (eu: any) =>
+          eu.role === "organizer" ||
+          eu.permissions?.includes("manage-certificates") ||
+          eu.permissions?.includes("view-certificates")
+      ) || false;
+
+      const canScanQR = eventUsers?.some(
+        (eu: any) =>
+          eu.role === "organizer" ||
+          eu.role === "staff" ||
+          eu.permissions?.includes("check-in")
+      ) || false;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          hasStaffAssignments,
+          canAccessCertificates,
+          canScanQR,
+          eventUsers: eventUsers || [],
+        },
+      });
+    } catch (error) {
+      console.error("Get permissions error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
 }
