@@ -305,7 +305,7 @@ const EventDetailsPage: React.FC = () => {
               <span className="font-medium">Back</span>
             </button>
 
-            {canManage && (
+            {/* {canManage && (
               <div className="flex items-center gap-2">
                 <Link
                   to={`/events/${event.id}/edit`}
@@ -341,7 +341,7 @@ const EventDetailsPage: React.FC = () => {
                   </svg>
                 </button>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </nav>

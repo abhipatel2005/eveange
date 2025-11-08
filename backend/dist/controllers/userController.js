@@ -20,10 +20,10 @@ export class UserController {
                 });
                 return;
             }
-            // Check if user exists and is currently a participant
+            // Check if user exists
             const { data: currentUser, error: fetchError } = await supabase
                 .from("users")
-                .select("id, role, email, name")
+                .select("id, email, name, organization_name, phone_number, created_at")
                 .eq("id", userId)
                 .single();
             if (fetchError || !currentUser) {
@@ -33,30 +33,23 @@ export class UserController {
                 });
                 return;
             }
-            if (currentUser.role === "organizer") {
-                res.status(400).json({
-                    success: false,
-                    error: "User is already an organizer",
-                });
-                return;
-            }
-            // Update user to organizer with additional details
+            // Insert into event_users as organizer for the new event
+            // You must provide the eventId in the request body (validatedData.eventId)
+            // Only update organization info, do not update role or assign event_users
             const { data: updatedUser, error: updateError } = await supabase
                 .from("users")
                 .update({
-                    role: "organizer",
-                    organization_name: validatedData.organizationName,
-                    phone_number: validatedData.phoneNumber,
-                    updated_at: new Date().toISOString(),
-                })
+                organization_name: validatedData.organizationName,
+                phone_number: validatedData.phoneNumber,
+                updated_at: new Date().toISOString(),
+            })
                 .eq("id", userId)
-                .select("id, email, name, role, organization_name, phone_number, created_at")
+                .select("id, email, name, organization_name, phone_number, created_at")
                 .single();
             if (updateError) {
-                console.error("Database error:", updateError);
                 res.status(500).json({
                     success: false,
-                    error: "Failed to upgrade user to organizer",
+                    error: "Failed to update organization info",
                 });
                 return;
             }
@@ -64,24 +57,13 @@ export class UserController {
                 success: true,
                 data: {
                     user: updatedUser,
-                    message: "Successfully upgraded to organizer",
+                    message: "Organization info updated successfully",
+                    canCreateEvent: true, // let frontend use this to show create event page
                 },
             });
         }
-        catch (error) {
-            if (error instanceof Error && error.name === "ZodError") {
-                res.status(400).json({
-                    success: false,
-                    error: "Invalid request data",
-                    details: error.message,
-                });
-                return;
-            }
-            console.error("Organizer upgrade error:", error);
-            res.status(500).json({
-                success: false,
-                error: "Internal server error",
-            });
+        catch (err) {
+            console.log(err);
         }
     }
     /**
@@ -117,6 +99,60 @@ export class UserController {
         }
         catch (error) {
             console.error("Get profile error:", error);
+            res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
+    }
+    /**
+     * Get user permissions from event_users table
+     * GET /api/users/permissions
+     */
+    static async getPermissions(req, res) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({
+                    success: false,
+                    error: "User not authenticated",
+                });
+                return;
+            }
+            // Get all event_users entries for this user
+            const { data: eventUsers, error } = await supabase
+                .from("event_users")
+                .select("event_id, role, permissions, is_active")
+                .eq("user_id", userId)
+                .eq("is_active", true);
+            if (error) {
+                console.error("Get permissions error:", error);
+                res.status(500).json({
+                    success: false,
+                    error: "Failed to fetch permissions",
+                });
+                return;
+            }
+            // Determine what the user can access
+            const hasStaffAssignments = eventUsers && eventUsers.length > 0;
+            const canAccessCertificates = eventUsers?.some((eu) => eu.role === "organizer" ||
+                eu.permissions?.includes("manage-certificates") ||
+                eu.permissions?.includes("view-certificates")) || false;
+            const canScanQR = eventUsers?.some((eu) => eu.role === "organizer" ||
+                eu.role === "staff" ||
+                eu.permissions?.includes("check-in")) || false;
+            res.status(200).json({
+                success: true,
+                data: {
+                    hasStaffAssignments,
+                    canAccessCertificates,
+                    canScanQR,
+                    eventUsers: eventUsers || [],
+                },
+            });
+        }
+        catch (error) {
+            console.error("Get permissions error:", error);
             res.status(500).json({
                 success: false,
                 error: "Internal server error",

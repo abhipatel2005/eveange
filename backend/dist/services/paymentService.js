@@ -1,7 +1,7 @@
 import Stripe from "stripe";
-import { supabaseAdmin } from "../config/supabase";
-import { EmailService } from "./emailService";
-import { getFreshAccessToken } from "../routes/emailAuth";
+import { supabaseAdmin } from "../config/supabase.js";
+import { EmailService } from "./emailService.js";
+import { getFreshAccessToken } from "../routes/emailAuth.js";
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: "2023-10-16",

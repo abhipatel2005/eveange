@@ -6,4 +6,6 @@ const router = Router();
 router.post("/upgrade-to-organizer", authenticateToken, UserController.upgradeToOrganizer);
 // GET /api/users/profile - Protected route
 router.get("/profile", authenticateToken, UserController.getProfile);
+// GET /api/users/permissions - Protected route
+router.get("/permissions", authenticateToken, UserController.getPermissions);
 export default router;

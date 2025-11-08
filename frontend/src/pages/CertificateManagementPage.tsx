@@ -74,9 +74,6 @@ const CertificateManagementPage: React.FC = () => {
   const [dataFields, setDataFields] = useState<DataField[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [selectedCertificates, setSelectedCertificates] = useState<string[]>(
-    []
-  );
   const [activeTab, setActiveTab] = useState<"generated" | "generate">(
     "generated"
   );

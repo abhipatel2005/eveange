@@ -66,8 +66,16 @@ export class RegistrationController {
                 });
                 return;
             }
-            // Check if user is the organizer (organizers can't register for their own events)
-            if (event.organizer_id === userId) {
+            // Check if user is an organizer for this event in event_users table
+            const { data: eventUser, error: eventUserError } = await supabase
+                .from("event_users")
+                .select("role")
+                .eq("event_id", eventId)
+                .eq("user_id", userId)
+                .eq("is_active", true)
+                .single();
+            // If user has organizer role for this event, they can't register as participant
+            if (!eventUserError && eventUser && eventUser.role === "organizer") {
                 res.status(403).json({
                     success: false,
                     error: "Organizers cannot register for their own events",
@@ -265,7 +273,7 @@ export class RegistrationController {
                 });
                 return;
             }
-            // Check if user is the organizer or admin
+            // Check if user is the organizer (only event owner can view registrations)
             const { data: event, error: eventError } = await supabase
                 .from("events")
                 .select("organizer_id")
@@ -278,7 +286,8 @@ export class RegistrationController {
                 });
                 return;
             }
-            if (userRole !== "admin" && event.organizer_id !== userId) {
+            // Only the event owner can view registrations
+            if (event.organizer_id !== userId) {
                 res.status(403).json({
                     success: false,
                     error: "You can only view registrations for your own events",
@@ -289,8 +298,8 @@ export class RegistrationController {
             const { data: registrations, error } = await supabase
                 .from("registrations")
                 .select(`
-          id, status, created_at, updated_at, email, name, responses, qr_code,
-          user:user_id(id, name, email, phone_number)
+          id, status, created_at, updated_at, qr_code, user_id, event_id, responses,
+          user:user_id(id, phone_number)
         `)
                 .eq("event_id", eventId)
                 .order("created_at", { ascending: false });
@@ -302,9 +311,35 @@ export class RegistrationController {
                 });
                 return;
             }
+            // Fetch name and email from event_users for each registration
+            const enrichedRegistrations = await Promise.all(registrations.map(async (registration) => {
+                const { data: eventUser } = await supabase
+                    .from("event_users")
+                    .select("name, email")
+                    .eq("event_id", registration.event_id)
+                    .eq("user_id", registration.user_id)
+                    .single();
+                // If event_users entry doesn't exist, fall back to registrations table data
+                let name = eventUser?.name;
+                let email = eventUser?.email;
+                if (!name || !email) {
+                    const { data: regData } = await supabase
+                        .from("registrations")
+                        .select("name, email")
+                        .eq("id", registration.id)
+                        .single();
+                    name = name || regData?.name;
+                    email = email || regData?.email;
+                }
+                return {
+                    ...registration,
+                    name,
+                    email,
+                };
+            }));
             res.json({
                 success: true,
-                data: { registrations },
+                data: { registrations: enrichedRegistrations },
             });
         }
         catch (error) {
@@ -329,7 +364,7 @@ export class RegistrationController {
             const { data: registrations, error } = await supabase
                 .from("registrations")
                 .select(`
-          id, status, payment_status, created_at, email, name, responses, qr_code,
+          id, status, payment_status, created_at, qr_code, event_id, user_id, responses,
           event:event_id(
             id, title, description, start_date, end_date, 
             location, banner_url, is_paid, price
@@ -345,8 +380,27 @@ export class RegistrationController {
                 });
                 return;
             }
-            // Fix QR codes for registrations that don't have the correct format
+            // Fix QR codes and fetch event_users data for each registration
             const updatedRegistrations = await Promise.all(registrations.map(async (registration) => {
+                // Fetch name and email from event_users table
+                const { data: eventUser } = await supabase
+                    .from("event_users")
+                    .select("name, email")
+                    .eq("event_id", registration.event_id)
+                    .eq("user_id", registration.user_id)
+                    .single();
+                // If event_users entry doesn't exist, fall back to registrations table data
+                let name = eventUser?.name;
+                let email = eventUser?.email;
+                if (!name || !email) {
+                    const { data: regData } = await supabase
+                        .from("registrations")
+                        .select("name, email")
+                        .eq("id", registration.id)
+                        .single();
+                    name = name || regData?.name;
+                    email = email || regData?.email;
+                }
                 if (!registration.qr_code || !registration.qr_code.includes(":")) {
                     // Generate correct QR code format: eventId:registrationId
                     const correctQrCode = `${registration.event.id}:${registration.id}`;
@@ -358,7 +412,11 @@ export class RegistrationController {
                     // Update local object
                     registration.qr_code = correctQrCode;
                 }
-                return registration;
+                return {
+                    ...registration,
+                    name,
+                    email,
+                };
             }));
             res.json({
                 success: true,
@@ -508,7 +566,7 @@ export class RegistrationController {
             const { data: registration, error: fetchError } = await supabase
                 .from("registrations")
                 .select(`
-          id, name, email, qr_code, status, created_at, user_id,
+          id, qr_code, status, created_at, user_id, event_id,
           event:event_id(
             id, title, start_date, end_date, location, 
             description, capacity, banner_url, is_paid, price,
@@ -523,6 +581,25 @@ export class RegistrationController {
                     error: "Registration not found",
                 });
                 return;
+            }
+            // Fetch name and email from event_users table
+            const { data: eventUser, error: eventUserError } = await supabase
+                .from("event_users")
+                .select("name, email")
+                .eq("event_id", registration.event_id)
+                .eq("user_id", registration.user_id)
+                .single();
+            // If event_users entry doesn't exist, fall back to registrations table data
+            let name = eventUser?.name;
+            let email = eventUser?.email;
+            if (!name || !email) {
+                const { data: regData } = await supabase
+                    .from("registrations")
+                    .select("name, email")
+                    .eq("id", registrationId)
+                    .single();
+                name = name || regData?.name;
+                email = email || regData?.email;
             }
             // Check if user has access to this registration
             // Users can only view their own registrations
@@ -541,7 +618,7 @@ export class RegistrationController {
                     .select("email")
                     .eq("id", userId)
                     .single();
-                if (!userData || userData.email !== registration.email) {
+                if (!userData || userData.email !== email) {
                     res.status(403).json({
                         success: false,
                         error: "You don't have permission to view this registration",
@@ -566,6 +643,8 @@ export class RegistrationController {
             }
             const formattedRegistration = {
                 ...registration,
+                name, // From event_users table
+                email, // From event_users table
                 event: eventData,
             };
             res.json({

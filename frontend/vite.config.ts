@@ -17,6 +17,32 @@ export default defineConfig({
       "@/api": path.resolve(__dirname, "./src/api"),
     },
   },
+  build: {
+    // Production optimizations
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true,
+      },
+    },
+    // Code splitting for better caching
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          ui: ["lucide-react", "framer-motion"],
+          forms: ["react-hook-form", "@hookform/resolvers", "zod"],
+          qr: ["qr-scanner", "react-qr-code", "@yudiel/react-qr-scanner"],
+          stripe: ["@stripe/stripe-js", "@stripe/react-stripe-js"],
+        },
+      },
+    },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
+    // Source maps for production debugging (optional, can be disabled)
+    sourcemap: false,
+  },
   server: {
     port: 5173,
     proxy: {

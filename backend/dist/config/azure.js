@@ -29,6 +29,7 @@ export class AzureBlobService {
         const ext = fileName.toLowerCase().split(".").pop();
         // Don't compress already compressed formats or small files
         if (ext === "pptx" ||
+            ext === "pdf" ||
             ext === "zip" ||
             ext === "jpg" ||
             ext === "jpeg" ||

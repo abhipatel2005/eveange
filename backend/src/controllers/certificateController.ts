@@ -8,8 +8,8 @@ import {
   AVAILABLE_DATA_FIELDS,
   type CertificateTemplate,
   type PlaceholderMapping,
-} from "../services/certificateGenerator";
-import { TemplateService } from "../services/templateService";
+} from "../services/certificateGenerator.js";
+import { TemplateService } from "../services/templateService.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

@@ -7,7 +7,6 @@ export class EventController {
     static async createEvent(req, res) {
         try {
             const userId = req.user?.id;
-            const userRole = req.user?.role;
             if (!userId) {
                 res.status(401).json({
                     success: false,
@@ -15,10 +14,23 @@ export class EventController {
                 });
                 return;
             }
-            if (userRole !== "organizer" && userRole !== "admin") {
+            // Fetch user profile to check org/phone
+            const { data: userProfile, error: userProfileError } = await supabase
+                .from("users")
+                .select("id, organization_name, phone_number")
+                .eq("id", userId)
+                .single();
+            if (userProfileError || !userProfile) {
                 res.status(403).json({
                     success: false,
-                    error: "Only organizers can create events",
+                    error: "User profile not found",
+                });
+                return;
+            }
+            if (!userProfile.organization_name || !userProfile.phone_number) {
+                res.status(403).json({
+                    success: false,
+                    error: "Organization name and phone number required to create events",
                 });
                 return;
             }
@@ -59,6 +71,34 @@ export class EventController {
                 });
                 return;
             }
+            // Add creator to event_users as organizer with full permissions
+            const defaultOrganizerPermissions = [
+                "manage-event",
+                "delete-event",
+                "view-registrations",
+                "manage-registrations",
+                "export-registrations",
+                "check-in",
+                "manage-staff",
+                "view-reports",
+                "manage-reports",
+                "send-emails",
+                "send-notifications",
+            ];
+            const { error: eventUserError } = await supabase
+                .from("event_users")
+                .insert({
+                event_id: event.id,
+                user_id: userId,
+                role: "organizer",
+                permissions: defaultOrganizerPermissions,
+                assigned_by: userId,
+                is_active: true,
+            });
+            if (eventUserError) {
+                console.error("Failed to add creator to event_users:", eventUserError);
+                // Optionally: return error or continue
+            }
             res.status(201).json({
                 success: true,
                 message: "Event created successfully",
@@ -84,7 +124,7 @@ export class EventController {
     // Get all events (with pagination and filters)
     static async getEvents(req, res) {
         try {
-            const { page = 1, limit = 10, visibility, categoryId, organizerId, search, upcoming = "true", } = req.query;
+            const { page = 1, limit = 10, visibility, categoryId, organizerId, search, upcoming = "true", free, week, } = req.query;
             const offset = (Number(page) - 1) * Number(limit);
             let query = supabase
                 .from("events")
@@ -118,19 +158,32 @@ export class EventController {
             if (upcoming === "true") {
                 query = query.gte("start_date", new Date().toISOString());
             }
+            // Filter for free events (is_paid = false or price = 0)
+            if (free === "true") {
+                query = query.eq("is_paid", false);
+            }
+            // Filter for events happening within the next 7 days
+            if (week === "true") {
+                const nowIso = new Date().toISOString();
+                const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                query = query
+                    .gte("start_date", nowIso)
+                    .lte("start_date", sevenDaysLater);
+            }
             const { data: events, error, count } = await query;
             if (error) {
                 console.error("Get events error:", error);
                 res.status(500).json({
                     success: false,
-                    error: "Failed to fetch events",
+                    error: "Failed to fetch events. Please check your database connection.",
                 });
                 return;
             }
+            // Return success even with no events, with a helpful message
             res.json({
                 success: true,
                 data: {
-                    events,
+                    events: events || [],
                     pagination: {
                         page: Number(page),
                         limit: Number(limit),
@@ -138,13 +191,32 @@ export class EventController {
                         pages: Math.ceil((count || 0) / Number(limit)),
                     },
                 },
+                message: !events || events.length === 0
+                    ? upcoming === "true"
+                        ? "No upcoming events found"
+                        : "No events found"
+                    : undefined,
             });
         }
         catch (error) {
-            console.error("Get events error:", error);
+            console.error("Get events error:", {
+                message: error?.message,
+                details: error?.stack,
+                hint: error?.hint || "",
+                code: error?.code || "",
+            });
+            // Provide more specific error messages
+            let errorMessage = "Internal server error";
+            if (error?.message?.includes("fetch failed")) {
+                errorMessage =
+                    "Unable to connect to database. Please check your network connection and database configuration.";
+            }
+            else if (error?.code === "PGRST116") {
+                errorMessage = "Database query error. Please contact support.";
+            }
             res.status(500).json({
                 success: false,
-                error: "Internal server error",
+                error: errorMessage,
             });
         }
     }
@@ -221,8 +293,8 @@ export class EventController {
                 });
                 return;
             }
-            // Check permissions
-            if (userRole !== "admin" && existingEvent.organizer_id !== userId) {
+            // Check permissions - only event owner can edit
+            if (existingEvent.organizer_id !== userId) {
                 res.status(403).json({
                     success: false,
                     error: "You can only edit your own events",
@@ -301,8 +373,8 @@ export class EventController {
                 });
                 return;
             }
-            // Check permissions
-            if (userRole !== "admin" && existingEvent.organizer_id !== userId) {
+            // Check permissions - only event owner can delete
+            if (existingEvent.organizer_id !== userId) {
                 res.status(403).json({
                     success: false,
                     error: "You can only delete your own events",
@@ -368,6 +440,62 @@ export class EventController {
         }
         catch (error) {
             console.error("Get my events error:", error);
+            res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
+    }
+    /**
+     * Get user's role for a specific event from event_users table
+     * GET /api/events/:id/user-role
+     */
+    static async getUserEventRole(req, res) {
+        try {
+            const userId = req.user?.id;
+            const { id } = req.params;
+            if (!userId) {
+                res.status(401).json({
+                    success: false,
+                    error: "Authentication required",
+                });
+                return;
+            }
+            if (!id) {
+                res.status(400).json({
+                    success: false,
+                    error: "Event ID is required",
+                });
+                return;
+            }
+            // Check if user has a role in event_users table for this event
+            const { data: eventUser, error } = await supabase
+                .from("event_users")
+                .select("role, permissions, is_active")
+                .eq("event_id", id)
+                .eq("user_id", userId)
+                .eq("is_active", true)
+                .single();
+            if (error && error.code !== "PGRST116") {
+                // PGRST116 is "no rows returned" which is okay
+                console.error("Get user event role error:", error);
+                res.status(500).json({
+                    success: false,
+                    error: "Failed to fetch user role",
+                });
+                return;
+            }
+            // Return the role if found, otherwise null
+            res.json({
+                success: true,
+                data: {
+                    role: eventUser?.role || null,
+                    permissions: eventUser?.permissions || [],
+                },
+            });
+        }
+        catch (error) {
+            console.error("Get user event role error:", error);
             res.status(500).json({
                 success: false,
                 error: "Internal server error",

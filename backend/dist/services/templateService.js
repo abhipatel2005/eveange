@@ -76,10 +76,10 @@ export class TemplateService {
             const { error: updateError } = await supabase
                 .from("certificate_templates")
                 .update({
-                    azure_url: azureUrl,
-                    uses_azure_storage: true,
-                    updated_at: new Date().toISOString(),
-                })
+                azure_url: azureUrl,
+                uses_azure_storage: true,
+                updated_at: new Date().toISOString(),
+            })
                 .eq("id", templateId);
             if (updateError) {
                 throw new Error(`Failed to update template record: ${updateError.message}`);
@@ -119,22 +119,22 @@ export class TemplateService {
             const { data: newTemplate, error: createError } = await supabase
                 .from("certificate_templates")
                 .insert({
-                    id: templateId,
-                    event_id: eventId,
-                    name: templateName,
-                    type: templateConfig.type || "powerpoint", // Individual column
-                    template: {
-                        azure_file_name: azureFileName,
-                        file_name: originalFileName,
-                        type: templateConfig.type || "powerpoint",
-                        ...templateConfig,
-                    }, // JSONB column with template configuration
-                    azure_url: secureUrl, // Individual column for Azure URL
-                    uses_azure_storage: true, // Individual column for storage type
-                    extracted_placeholders: templateConfig.placeholders || [], // Individual column
-                    placeholder_mapping: templateConfig.placeholder_mapping || {}, // Individual column
-                    file_path: null, // No local file path for Azure storage
-                })
+                id: templateId,
+                event_id: eventId,
+                name: templateName,
+                type: templateConfig.type || "powerpoint", // Individual column
+                template: {
+                    azure_file_name: azureFileName,
+                    file_name: originalFileName,
+                    type: templateConfig.type || "powerpoint",
+                    ...templateConfig,
+                }, // JSONB column with template configuration
+                azure_url: secureUrl, // Individual column for Azure URL
+                uses_azure_storage: true, // Individual column for storage type
+                extracted_placeholders: templateConfig.placeholders || [], // Individual column
+                placeholder_mapping: templateConfig.placeholder_mapping || {}, // Individual column
+                file_path: null, // No local file path for Azure storage
+            })
                 .select("*")
                 .single();
             if (createError) {

@@ -9,9 +9,10 @@ router.get("/test/:userId", async (req, res) => {
         console.log("🧪 Testing staff assignments for user:", userId);
         // Simple query without joins first
         const { data: assignments, error } = await supabase
-            .from("staff_assignments")
+            .from("event_users")
             .select("*")
-            .eq("staff_id", userId);
+            .eq("user_id", userId)
+            .eq("role", "staff");
         console.log("📊 Raw assignments:", JSON.stringify(assignments, null, 2));
         console.log("❌ Assignment error:", error);
         // Also test the event query
@@ -39,9 +40,10 @@ router.get("/assigned-events", authenticateToken, async (req, res) => {
         console.log("📋 Fetching assigned events for staff user:", userId);
         // Get staff assignments first, then fetch events separately
         const { data: assignments, error: assignmentError } = await supabase
-            .from("staff_assignments")
+            .from("event_users")
             .select("*")
-            .eq("staff_id", userId);
+            .eq("user_id", userId)
+            .eq("role", "staff");
         if (assignmentError) {
             console.error("❌ Error fetching staff assignments:", assignmentError);
             return res.status(500).json({
@@ -116,7 +118,7 @@ router.get("/events/:eventId", authenticateToken, async (req, res) => {
         console.log("📋 Fetching event details for staff user:", userId, "event:", eventId);
         // Check if staff has access to this event
         const { data: assignment, error: assignmentError } = await supabase
-            .from("staff_assignments")
+            .from("event_users")
             .select(`
           id,
           permissions,
@@ -132,8 +134,9 @@ router.get("/events/:eventId", authenticateToken, async (req, res) => {
             is_active
           )
         `)
-            .eq("staff_id", userId)
+            .eq("user_id", userId)
             .eq("event_id", eventId)
+            .eq("role", "staff")
             .single();
         if (assignmentError || !assignment) {
             console.error("❌ Staff not assigned to event or event not found:", assignmentError);

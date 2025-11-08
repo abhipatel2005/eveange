@@ -61,22 +61,24 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
         }
         console.log("✅ Event found:", event.title);
         // Check if staff member already exists
-        console.log("👤 Checking if user exists...");
+        console.log("👤 Checking if user exists (admin)...");
         let staffUser;
-        const { data: existingUser } = await supabase
+        const { data: existingUser } = await supabaseAdmin
             .from("users")
             .select("*")
             .eq("email", email)
             .single();
-        console.log("👤 Existing user check result:", existingUser);
+        console.log("👤 Existing user check result (admin):", existingUser);
         if (existingUser) {
-            // User exists, check if already assigned to this event
-            console.log("🔍 User exists, checking assignment...");
-            const { data: existingAssignment } = await supabase
-                .from("staff_assignments")
+            staffUser = existingUser;
+            console.log("✅ User already exists, checking assignment...");
+            // Check if already assigned to this event
+            const { data: existingAssignment } = await supabaseAdmin
+                .from("event_users")
                 .select("*")
-                .eq("staff_id", existingUser.id)
+                .eq("user_id", existingUser.id)
                 .eq("event_id", eventId)
+                .eq("role", "staff")
                 .single();
             console.log("📋 Assignment check result:", existingAssignment);
             if (existingAssignment) {
@@ -85,8 +87,14 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
                     error: "Staff member already assigned to this event",
                 });
             }
-            staffUser = existingUser;
-            console.log("✅ Using existing user");
+            // Send notification email to existing user
+            try {
+                await EmailService.sendStaffAssignmentNotification(email, name, event.title, `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`);
+                console.log(`✅ Staff assignment notification sent to: ${email}`);
+            }
+            catch (notifyError) {
+                console.error("📧 Notification email sending failed:", notifyError);
+            }
         }
         else {
             // Create new user for staff member
@@ -96,58 +104,109 @@ router.post("/events/:eventId/staff", authenticateToken, async (req, res) => {
             const { data: newUser, error: userError } = await supabaseAdmin
                 .from("users")
                 .insert({
-                    email,
-                    name,
-                    password_hash: hashedPassword,
-                    role: "staff",
-                })
+                email,
+                name,
+                password_hash: hashedPassword,
+                role: "staff",
+            })
                 .select("*")
                 .single();
             console.log("👤 User creation result:", { newUser, userError });
-            if (userError || !newUser) {
-                console.log("❌ User creation failed");
-                return res.status(400).json({
-                    error: "Failed to create staff user",
-                    details: userError?.message,
-                });
-            }
-            staffUser = newUser;
-            // Send email with login credentials
-            console.log("📧 Attempting to send staff credentials email to:", email);
-            // Check if user has granted Gmail permission for delegated sending
-            const freshTokenData = await getFreshAccessToken(userId);
-            if (freshTokenData) {
-                console.log("🔑 Using user-delegated Gmail sending from:", freshTokenData.email);
-                console.log("🎫 Has access token:", !!freshTokenData.accessToken);
-                console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
-            }
-            else {
-                console.log("⚠️ No user Gmail permission, using system email");
-            }
-            try {
-                const emailSent = await EmailService.sendStaffCredentials(email, name, tempPassword, event.title, `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`, freshTokenData?.email, freshTokenData?.accessToken, freshTokenData?.refreshToken);
-                if (emailSent) {
-                    console.log(`✅ Staff credentials sent successfully to: ${email}`);
+            if (userError) {
+                // If duplicate email error, fetch the existing user and check assignment
+                if (userError.code === "23505") {
+                    console.log("⚠️ User already exists (duplicate email), fetching existing user...");
+                    const { data: adminExistingUser, error: adminUserFetchError } = await supabaseAdmin
+                        .from("users")
+                        .select("*")
+                        .eq("email", email)
+                        .single();
+                    if (!adminExistingUser || adminUserFetchError) {
+                        console.log("❌ Could not fetch existing user after duplicate error");
+                        return res.status(400).json({
+                            error: "Failed to create or fetch staff user",
+                            details: userError?.message,
+                        });
+                    }
+                    // Check if user is already assigned to this event
+                    const { data: existingAssignment } = await supabaseAdmin
+                        .from("event_users")
+                        .select("*")
+                        .eq("user_id", adminExistingUser.id)
+                        .eq("event_id", eventId)
+                        .eq("role", "staff")
+                        .single();
+                    if (existingAssignment) {
+                        console.log("❌ Staff already assigned to this event");
+                        return res.status(400).json({
+                            error: "Staff member already assigned to this event",
+                        });
+                    }
+                    staffUser = adminExistingUser;
+                    // Send notification email to existing user
+                    try {
+                        await EmailService.sendStaffAssignmentNotification(email, name, event.title, `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`);
+                        console.log(`✅ Staff assignment notification sent to: ${email}`);
+                    }
+                    catch (notifyError) {
+                        console.error("📧 Notification email sending failed:", notifyError);
+                    }
                 }
                 else {
-                    console.log(`⚠️ Staff credentials could not be sent to: ${email} (but staff was created)`);
+                    console.log("❌ User creation failed");
+                    return res.status(400).json({
+                        error: "Failed to create staff user",
+                        details: userError?.message,
+                    });
                 }
             }
-            catch (emailError) {
-                console.error("📧 Email sending failed:", emailError);
-                // Don't fail the whole operation if email fails
+            else if (newUser) {
+                staffUser = newUser;
+                // Send email with login credentials
+                console.log("📧 Attempting to send staff credentials email to:", email);
+                // Check if user has granted Gmail permission for delegated sending
+                const freshTokenData = await getFreshAccessToken(userId);
+                if (freshTokenData) {
+                    console.log("🔑 Using user-delegated Gmail sending from:", freshTokenData.email);
+                    console.log("🎫 Has access token:", !!freshTokenData.accessToken);
+                    console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
+                }
+                else {
+                    console.log("⚠️ No user Gmail permission, using system email");
+                }
+                try {
+                    const emailSent = await EmailService.sendStaffCredentials(email, name, tempPassword, event.title, `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`, freshTokenData?.email, freshTokenData?.accessToken, freshTokenData?.refreshToken);
+                    if (emailSent) {
+                        console.log(`✅ Staff credentials sent successfully to: ${email}`);
+                    }
+                    else {
+                        console.log(`⚠️ Staff credentials could not be sent to: ${email} (but staff was created)`);
+                    }
+                }
+                catch (emailError) {
+                    console.error("📧 Email sending failed:", emailError);
+                    // Don't fail the whole operation if email fails
+                }
             }
+        }
+        // Ensure staffUser is set before proceeding
+        if (!staffUser) {
+            console.log("❌ Staff user not set");
+            return res.status(500).json({
+                error: "Failed to process staff user",
+            });
         }
         // Create staff assignment
         // Permissions are already in array format from frontend
         const { data: assignment, error: assignmentError } = await supabaseAdmin
-            .from("staff_assignments")
+            .from("event_users")
             .insert({
-                staff_id: staffUser.id,
-                event_id: eventId,
-                assigned_by: userId,
-                permissions: permissions,
-            })
+            user_id: staffUser.id,
+            event_id: eventId,
+            role: "staff",
+            assigned_by: userId,
+            permissions: permissions,
+        })
             .select("*")
             .single();
         if (assignmentError) {
@@ -213,16 +272,17 @@ router.get("/events/:eventId/staff", authenticateToken, async (req, res) => {
         }
         // Fetch staff assignments with user details
         const { data: staffAssignments, error: staffError } = await supabaseAdmin
-            .from("staff_assignments")
+            .from("event_users")
             .select(`
           id,
           permissions,
           created_at,
           assigned_by,
-          staff_id,
+          user_id,
           event_id
         `)
             .eq("event_id", eventId)
+            .eq("role", "staff")
             .order("created_at", { ascending: false });
         console.log("🔍 Staff assignments raw data:", staffAssignments);
         if (staffError) {
@@ -237,7 +297,7 @@ router.get("/events/:eventId/staff", authenticateToken, async (req, res) => {
             const { data: staffUser } = await supabaseAdmin
                 .from("users")
                 .select("id, name, email, last_login_at")
-                .eq("id", assignment.staff_id)
+                .eq("id", assignment.user_id)
                 .single();
             // Fetch assigned_by user details
             const { data: assignedByUser } = await supabaseAdmin
@@ -309,10 +369,11 @@ router.get("/events/:eventId/stats", authenticateToken, async (req, res) => {
             console.log("🔍 Checking staff access...");
             // Check if user is staff for this event - remove is_active constraint
             const { data: staffAccess, error: staffError } = await supabase
-                .from("staff_assignments")
+                .from("event_users")
                 .select("id, permissions")
-                .eq("staff_id", userId)
+                .eq("user_id", userId)
                 .eq("event_id", eventId)
+                .eq("role", "staff")
                 .single();
             // console.log("👷 Staff access result:", { staffAccess, staffError });
             isStaff =
@@ -329,14 +390,15 @@ router.get("/events/:eventId/stats", authenticateToken, async (req, res) => {
             .select("*", { count: "exact", head: true })
             .eq("event_id", eventId)
             .eq("status", "confirmed");
-        // Get total check-ins
+        // Get total check-ins (attendance table only contains checked-in participants)
         const { count: totalCheckIns } = await supabaseAdmin
             .from("attendance")
             .select("*", { count: "exact", head: true })
-            .eq("event_id", eventId)
-            .eq("status", "checked_in");
-        // Get recent check-ins
-        const { data: recentCheckIns } = await supabaseAdmin
+            .eq("event_id", eventId);
+        // Get check-ins - support optional 'all' parameter for attendance page
+        const getAllRecords = req.query.all === "true";
+        const limit = getAllRecords ? 1000 : 10; // Get up to 1000 records if 'all' is requested
+        const { data: recentCheckIns, error: recentError } = await supabaseAdmin
             .from("attendance")
             .select(`
           id,
@@ -346,14 +408,17 @@ router.get("/events/:eventId/stats", authenticateToken, async (req, res) => {
             name,
             email
           ),
-          checked_in_by:users!checked_in_by_id (
+          checked_in_by_user:users!checked_in_by (
             name
           )
         `)
             .eq("event_id", eventId)
-            .eq("status", "checked_in")
             .order("checked_in_at", { ascending: false })
-            .limit(10);
+            .limit(limit);
+        // console.log("📋 Recent check-ins query result:", {
+        //   recentCheckIns,
+        //   recentError,
+        // });
         const checkInRate = (totalRegistrations || 0) > 0
             ? (((totalCheckIns || 0) / (totalRegistrations || 1)) * 100).toFixed(1)
             : "0";
@@ -371,9 +436,10 @@ router.get("/events/:eventId/stats", authenticateToken, async (req, res) => {
                 email: checkIn.registrations?.email || "Unknown",
             },
             checked_in_by_user: {
-                name: checkIn.checked_in_by?.name || "System",
+                name: checkIn.checked_in_by_user?.name || "System",
             },
         })) || [];
+        console.log("✅ Formatted recent check-ins:", formattedRecentCheckIns.length);
         // console.log("✅ Check-in stats retrieved successfully");
         res.json({
             success: true,
@@ -390,250 +456,251 @@ router.get("/events/:eventId/stats", authenticateToken, async (req, res) => {
     }
 });
 // Check in a participant using QR code
-router.post("/events/:eventId",
-    // authenticateToken, // Temporarily disabled for testing
-    async (req, res) => {
-        console.log("🚨 ROUTE HIT! Check-in route was called!");
-        console.log("🚨 Request reached check-in handler!");
+router.post("/events/:eventId", 
+// authenticateToken, // Temporarily disabled for testing
+async (req, res) => {
+    console.log("🚨 ROUTE HIT! Check-in route was called!");
+    console.log("🚨 Request reached check-in handler!");
+    try {
+        const eventId = req.params.eventId;
+        // Temporarily mock user for testing
+        const userId = "5a054e3a-034d-4a4c-a7fc-444514cb7e9e"; // Admin user ID from logs
+        req.user = {
+            id: userId,
+            email: "patelabhideep02@gmail.com",
+            role: "admin",
+        };
+        const { qr_code, location = "Main Entrance", device_info } = req.body;
+        console.log("🎫 === CHECK-IN REQUEST START ===");
+        console.log("🎫 Processing check-in for event:", eventId);
+        console.log("👤 User ID:", userId);
+        console.log("📋 QR Code:", qr_code);
+        console.log("� Request params:", req.params);
+        console.log("📋 Request body:", req.body);
+        console.log("🔑 User details:", req.user);
+        if (!qr_code) {
+            console.log("❌ No QR code provided");
+            return res.status(400).json({ error: "QR code is required" });
+        }
+        console.log("🔍 Checking event access for eventId:", eventId);
+        // Check if user has access to this event (either organizer or staff)
+        const { data: eventAccess, error: eventError } = await supabaseAdmin
+            .from("events")
+            .select("id, organizer_id, title")
+            .eq("id", eventId)
+            .single();
+        console.log("🎪 Event access result:", { eventAccess, eventError });
+        if (eventError || !eventAccess) {
+            console.log("❌ Event not found or error:", eventError);
+            console.log("❌ eventId being queried:", eventId);
+            console.log("❌ eventError details:", JSON.stringify(eventError, null, 2));
+            return res.status(404).json({ error: "Event not found" });
+        }
+        const isOrganizer = eventAccess.organizer_id === userId;
+        // console.log(
+        //   "👑 Is organizer:",
+        //   isOrganizer,
+        //   "organizer_id:",
+        //   eventAccess.organizer_id,
+        //   "user_id:",
+        //   userId
+        // );
+        let isStaff = false;
+        if (!isOrganizer) {
+            // Check if user is staff for this event
+            const { data: staffAccess } = await supabaseAdmin
+                .from("event_users")
+                .select("id, permissions")
+                .eq("user_id", userId)
+                .eq("event_id", eventId)
+                .eq("role", "staff")
+                .eq("is_active", true)
+                .single();
+            isStaff =
+                !!staffAccess && staffAccess.permissions?.includes("check-in");
+        }
+        if (!isOrganizer && !isStaff) {
+            return res.status(403).json({ error: "Access denied" });
+        }
+        // Enhanced QR code parsing - supports multiple formats
+        let registrationId;
         try {
-            const eventId = req.params.eventId;
-            // Temporarily mock user for testing
-            const userId = "5a054e3a-034d-4a4c-a7fc-444514cb7e9e"; // Admin user ID from logs
-            req.user = {
-                id: userId,
-                email: "patelabhideep02@gmail.com",
-                role: "admin",
-            };
-            const { qr_code, location = "Main Entrance", device_info } = req.body;
-            console.log("🎫 === CHECK-IN REQUEST START ===");
-            console.log("🎫 Processing check-in for event:", eventId);
-            console.log("👤 User ID:", userId);
-            console.log("📋 QR Code:", qr_code);
-            console.log("� Request params:", req.params);
-            console.log("📋 Request body:", req.body);
-            console.log("🔑 User details:", req.user);
-            if (!qr_code) {
-                console.log("❌ No QR code provided");
-                return res.status(400).json({ error: "QR code is required" });
-            }
-            console.log("🔍 Checking event access for eventId:", eventId);
-            // Check if user has access to this event (either organizer or staff)
-            const { data: eventAccess, error: eventError } = await supabaseAdmin
-                .from("events")
-                .select("id, organizer_id, title")
-                .eq("id", eventId)
-                .single();
-            console.log("🎪 Event access result:", { eventAccess, eventError });
-            if (eventError || !eventAccess) {
-                console.log("❌ Event not found or error:", eventError);
-                console.log("❌ eventId being queried:", eventId);
-                console.log("❌ eventError details:", JSON.stringify(eventError, null, 2));
-                return res.status(404).json({ error: "Event not found" });
-            }
-            const isOrganizer = eventAccess.organizer_id === userId;
-            // console.log(
-            //   "👑 Is organizer:",
-            //   isOrganizer,
-            //   "organizer_id:",
-            //   eventAccess.organizer_id,
-            //   "user_id:",
-            //   userId
-            // );
-            let isStaff = false;
-            if (!isOrganizer) {
-                // Check if user is staff for this event
-                const { data: staffAccess } = await supabaseAdmin
-                    .from("staff_assignments")
-                    .select("id, permissions")
-                    .eq("staff_id", userId)
-                    .eq("event_id", eventId)
-                    .eq("is_active", true)
-                    .single();
-                isStaff =
-                    !!staffAccess && staffAccess.permissions?.includes("check-in");
-            }
-            if (!isOrganizer && !isStaff) {
-                return res.status(403).json({ error: "Access denied" });
-            }
-            // Enhanced QR code parsing - supports multiple formats
-            let registrationId;
-            try {
-                console.log("🔍 Parsing QR code format:", qr_code);
-                // Format 1: eventId:registrationId (preferred format)
-                if (qr_code.includes(":") && !qr_code.startsWith("QR_")) {
-                    const [qrEventId, qrRegistrationId] = qr_code.split(":");
-                    console.log("📋 Event-prefixed format detected:", {
-                        qrEventId,
-                        qrRegistrationId,
+            console.log("🔍 Parsing QR code format:", qr_code);
+            // Format 1: eventId:registrationId (preferred format)
+            if (qr_code.includes(":") && !qr_code.startsWith("QR_")) {
+                const [qrEventId, qrRegistrationId] = qr_code.split(":");
+                console.log("📋 Event-prefixed format detected:", {
+                    qrEventId,
+                    qrRegistrationId,
+                });
+                if (qrEventId !== eventId) {
+                    console.log("❌ Event ID mismatch:", qrEventId, "vs", eventId);
+                    return res.status(400).json({
+                        error: "QR code is for a different event",
+                        details: `This QR code is for event ${qrEventId}, but you're scanning for event ${eventId}`,
                     });
-                    if (qrEventId !== eventId) {
-                        console.log("❌ Event ID mismatch:", qrEventId, "vs", eventId);
-                        return res.status(400).json({
-                            error: "QR code is for a different event",
-                            details: `This QR code is for event ${qrEventId}, but you're scanning for event ${eventId}`,
-                        });
-                    }
-                    registrationId = qrRegistrationId;
                 }
-                // Format 2: QR_XXX_timestamp (legacy format) or UUID format
-                else {
-                    console.log("📋 Direct registration ID format detected");
-                    registrationId = qr_code;
-                }
-                console.log("✅ Extracted registration ID:", registrationId);
-                console.log("🔍 About to validate registration ID format...");
-                // Validate registration ID format
-                if (!registrationId || registrationId.length < 5) {
-                    console.log("❌ Registration ID validation failed:", registrationId);
-                    throw new Error("Invalid registration ID format");
-                }
-                console.log("✅ Registration ID format validated successfully");
+                registrationId = qrRegistrationId;
             }
-            catch (error) {
-                console.log("❌ QR parsing error:", error);
-                return res.status(400).json({
-                    error: "Invalid QR code format",
-                    details: "QR code could not be parsed. Please ensure you're using a valid event ticket.",
-                });
+            // Format 2: QR_XXX_timestamp (legacy format) or UUID format
+            else {
+                console.log("📋 Direct registration ID format detected");
+                registrationId = qr_code;
             }
-            console.log("🔍 About to check event details...");
-            // Check if event has ended - prevent check-ins after event end
-            const { data: eventDetails, error: eventDetailsError } = await supabaseAdmin
-                .from("events")
-                .select("id, title, start_date, end_date")
-                .eq("id", eventId)
-                .single();
-            console.log("🎪 Event details lookup result:", {
-                eventDetails,
-                eventDetailsError,
-            });
-            if (eventDetailsError || !eventDetails) {
-                return res.status(404).json({ error: "Event not found" });
+            console.log("✅ Extracted registration ID:", registrationId);
+            console.log("🔍 About to validate registration ID format...");
+            // Validate registration ID format
+            if (!registrationId || registrationId.length < 5) {
+                console.log("❌ Registration ID validation failed:", registrationId);
+                throw new Error("Invalid registration ID format");
             }
-            console.log("🔍 About to check event timing...");
-            // Check if event has ended
-            const now = new Date();
-            const eventEndDate = new Date(eventDetails.end_date);
-            console.log("⏰ Time check:", {
-                now: now.toISOString(),
-                eventEndDate: eventEndDate.toISOString(),
-                hasEnded: now > eventEndDate,
-            });
-            if (now > eventEndDate) {
-                return res.status(400).json({
-                    error: "Check-in not allowed: Event has ended",
-                    eventEndDate: eventDetails.end_date,
-                    message: `This event ended on ${eventEndDate.toLocaleString()}. QR scanning is no longer available.`,
-                });
-            }
-            // Note: Early check-in restriction removed - events can decide their own check-in policies
-            // Future enhancement: Add per-event setting for "allow_early_checkin" or "checkin_start_time"
-            // Example:
-            // if (eventDetails.restrict_early_checkin) {
-            //   const eventStartDate = new Date(eventDetails.start_date);
-            //   if (now < eventStartDate) {
-            //     return res.status(400).json({ error: "Event hasn't started yet" });
-            //   }
-            // }
-            // Note: Event status check removed - events table doesn't have status column
-            // If needed in the future, add status column to events table first
-            console.log("🔍 About to lookup registration...", {
-                registrationId,
-                eventId,
-            });
-            // Find the registration
-            const { data: registration, error: regError } = await supabaseAdmin
-                .from("registrations")
-                .select("id, name, email, event_id, status, qr_code")
-                .eq("id", registrationId)
-                .eq("event_id", eventId)
-                .single();
-            console.log("📋 Registration lookup completed:", {
-                registration,
-                regError,
-            });
-            if (regError || !registration) {
-                return res.status(404).json({
-                    error: "Registration not found",
-                    details: "This QR code does not correspond to a valid registration for this event. Please check your ticket or contact support.",
-                });
-            }
-            if (registration.status !== "confirmed") {
-                console.log("❌ Registration not confirmed:", registration.status);
-                return res.status(400).json({ error: "Registration is not confirmed" });
-            }
-            console.log("✅ Registration is confirmed, checking for duplicates...");
-            // Check for duplicate check-in
-            const { data: existingCheckIn, error: checkInError } = await supabaseAdmin
-                .from("attendance")
-                .select("id, checked_in_at, location")
-                .eq("registration_id", registration.id)
-                .eq("event_id", eventId)
-                .single();
-            console.log("🔍 Duplicate check result:", {
-                existingCheckIn,
-                checkInError,
-            });
-            if (existingCheckIn && !checkInError) {
-                const checkedInTime = new Date(existingCheckIn.checked_in_at);
-                const timeAgo = Math.floor((Date.now() - checkedInTime.getTime()) / 1000 / 60); // minutes ago
-                return res.status(409).json({
-                    error: "Participant already checked in",
-                    message: `${registration.name} was already checked in ${timeAgo} minutes ago`,
-                    details: {
-                        participant_name: registration.name,
-                        checked_in_at: existingCheckIn.checked_in_at,
-                        checked_in_time_formatted: checkedInTime.toLocaleString(),
-                        location: existingCheckIn.location,
-                        minutes_ago: timeAgo,
-                    },
-                });
-            }
-            console.log("✅ No duplicate found, creating attendance record...");
-            // Create attendance record
-            const { data: attendance, error: attendanceError } = await supabaseAdmin
-                .from("attendance")
-                .insert({
-                    registration_id: registrationId,
-                    event_id: eventId,
-                    checked_in_by: userId,
-                    checked_in_at: new Date().toISOString(),
-                    location: location,
-                    device_info: device_info,
-                })
-                .select("*")
-                .single();
-            console.log("📋 Attendance record creation result:", {
-                attendance,
-                attendanceError,
-            });
-            if (attendanceError) {
-                return res
-                    .status(500)
-                    .json({ error: "Failed to check in participant" });
-            }
-            res.json({
-                success: true,
-                message: "Participant checked in successfully",
-                participant: {
-                    id: registration.id,
-                    name: registration.name,
-                    email: registration.email,
-                },
-                attendance: {
-                    id: attendance.id,
-                    checked_in_at: attendance.checked_in_at,
-                    location: attendance.location,
-                },
-            });
+            console.log("✅ Registration ID format validated successfully");
         }
         catch (error) {
-            console.error("❌ DETAILED ERROR in check-in route:", error);
-            console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack");
-            res.status(500).json({
-                error: "Internal server error",
-                details: error instanceof Error ? error.message : "Unknown error",
+            console.log("❌ QR parsing error:", error);
+            return res.status(400).json({
+                error: "Invalid QR code format",
+                details: "QR code could not be parsed. Please ensure you're using a valid event ticket.",
             });
         }
-    });
+        console.log("🔍 About to check event details...");
+        // Check if event has ended - prevent check-ins after event end
+        const { data: eventDetails, error: eventDetailsError } = await supabaseAdmin
+            .from("events")
+            .select("id, title, start_date, end_date")
+            .eq("id", eventId)
+            .single();
+        console.log("🎪 Event details lookup result:", {
+            eventDetails,
+            eventDetailsError,
+        });
+        if (eventDetailsError || !eventDetails) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        console.log("🔍 About to check event timing...");
+        // Check if event has ended
+        const now = new Date();
+        const eventEndDate = new Date(eventDetails.end_date);
+        console.log("⏰ Time check:", {
+            now: now.toISOString(),
+            eventEndDate: eventEndDate.toISOString(),
+            hasEnded: now > eventEndDate,
+        });
+        if (now > eventEndDate) {
+            return res.status(400).json({
+                error: "Check-in not allowed: Event has ended",
+                eventEndDate: eventDetails.end_date,
+                message: `This event ended on ${eventEndDate.toLocaleString()}. QR scanning is no longer available.`,
+            });
+        }
+        // Note: Early check-in restriction removed - events can decide their own check-in policies
+        // Future enhancement: Add per-event setting for "allow_early_checkin" or "checkin_start_time"
+        // Example:
+        // if (eventDetails.restrict_early_checkin) {
+        //   const eventStartDate = new Date(eventDetails.start_date);
+        //   if (now < eventStartDate) {
+        //     return res.status(400).json({ error: "Event hasn't started yet" });
+        //   }
+        // }
+        // Note: Event status check removed - events table doesn't have status column
+        // If needed in the future, add status column to events table first
+        console.log("🔍 About to lookup registration...", {
+            registrationId,
+            eventId,
+        });
+        // Find the registration
+        const { data: registration, error: regError } = await supabaseAdmin
+            .from("registrations")
+            .select("id, name, email, event_id, status, qr_code")
+            .eq("id", registrationId)
+            .eq("event_id", eventId)
+            .single();
+        console.log("📋 Registration lookup completed:", {
+            registration,
+            regError,
+        });
+        if (regError || !registration) {
+            return res.status(404).json({
+                error: "Registration not found",
+                details: "This QR code does not correspond to a valid registration for this event. Please check your ticket or contact support.",
+            });
+        }
+        if (registration.status !== "confirmed") {
+            console.log("❌ Registration not confirmed:", registration.status);
+            return res.status(400).json({ error: "Registration is not confirmed" });
+        }
+        console.log("✅ Registration is confirmed, checking for duplicates...");
+        // Check for duplicate check-in
+        const { data: existingCheckIn, error: checkInError } = await supabaseAdmin
+            .from("attendance")
+            .select("id, checked_in_at, location")
+            .eq("registration_id", registration.id)
+            .eq("event_id", eventId)
+            .single();
+        console.log("🔍 Duplicate check result:", {
+            existingCheckIn,
+            checkInError,
+        });
+        if (existingCheckIn && !checkInError) {
+            const checkedInTime = new Date(existingCheckIn.checked_in_at);
+            const timeAgo = Math.floor((Date.now() - checkedInTime.getTime()) / 1000 / 60); // minutes ago
+            return res.status(409).json({
+                error: "Participant already checked in",
+                message: `${registration.name} was already checked in ${timeAgo} minutes ago`,
+                details: {
+                    participant_name: registration.name,
+                    checked_in_at: existingCheckIn.checked_in_at,
+                    checked_in_time_formatted: checkedInTime.toLocaleString(),
+                    location: existingCheckIn.location,
+                    minutes_ago: timeAgo,
+                },
+            });
+        }
+        console.log("✅ No duplicate found, creating attendance record...");
+        // Create attendance record
+        const { data: attendance, error: attendanceError } = await supabaseAdmin
+            .from("attendance")
+            .insert({
+            registration_id: registrationId,
+            event_id: eventId,
+            checked_in_by: userId,
+            checked_in_at: new Date().toISOString(),
+            location: location,
+            device_info: device_info,
+        })
+            .select("*")
+            .single();
+        console.log("📋 Attendance record creation result:", {
+            attendance,
+            attendanceError,
+        });
+        if (attendanceError) {
+            return res
+                .status(500)
+                .json({ error: "Failed to check in participant" });
+        }
+        res.json({
+            success: true,
+            message: "Participant checked in successfully",
+            participant: {
+                id: registration.id,
+                name: registration.name,
+                email: registration.email,
+            },
+            attendance: {
+                id: attendance.id,
+                checked_in_at: attendance.checked_in_at,
+                location: attendance.location,
+            },
+        });
+    }
+    catch (error) {
+        console.error("❌ DETAILED ERROR in check-in route:", error);
+        console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack");
+        res.status(500).json({
+            error: "Internal server error",
+            details: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+});
 export default router;
