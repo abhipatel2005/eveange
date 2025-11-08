@@ -130,7 +130,7 @@ export const certificateController = {
                     // Read file buffer from uploaded file
                     const fileBuffer = await fs.readFile(filePath);
                     const newTemplate = await TemplateService.createTemplateWithAzure(eventId || null, name, fileBuffer, // Pass buffer instead of file path
-                    req.file.originalname, templateConfig);
+                        req.file.originalname, templateConfig);
                     // Clean up local uploaded file immediately after reading
                     try {
                         await fs.unlink(filePath);
@@ -156,24 +156,23 @@ export const certificateController = {
                     const { data, error } = await supabase
                         .from("certificate_templates")
                         .insert({
-                        event_id: eventId || null, // Allow null for global templates
-                        name,
-                        type: type || "powerpoint", // Individual column
-                        template: {
-                            file_path: filePath,
-                            file_name: req.file.originalname,
-                            type: type || "powerpoint",
-                            placeholders: placeholders || [],
-                            placeholder_mapping: placeholderMapping || {},
-                            available_fields: AVAILABLE_DATA_FIELDS,
-                        }, // JSONB column with template configuration
-                        extracted_placeholders: placeholders || [], // Individual column
-                        placeholder_mapping: placeholderMapping || {}, // Individual column
-                        template_data: templateData || {}, // Individual column
-                        file_path: filePath, // Individual column for local file path
-                        uses_azure_storage: false, // Individual column for storage type
-                        azure_url: null, // Individual column - null for local storage
-                    })
+                            event_id: eventId || null, // Allow null for global templates
+                            name,
+                            type: type || "powerpoint", // Individual column
+                            template: {
+                                file_path: filePath,
+                                file_name: req.file.originalname,
+                                type: type || "powerpoint",
+                                placeholders: placeholders || [],
+                                placeholder_mapping: placeholderMapping || {},
+                                available_fields: AVAILABLE_DATA_FIELDS,
+                            }, // JSONB column with template configuration
+                            extracted_placeholders: placeholders || [], // Individual column
+                            placeholder_mapping: placeholderMapping || {}, // Individual column
+                            file_path: filePath, // Individual column for local file path
+                            uses_azure_storage: false, // Individual column for storage type
+                            azure_url: null, // Individual column - null for local storage
+                        })
                         .select()
                         .single();
                     if (error) {
@@ -228,9 +227,9 @@ export const certificateController = {
             const { data, error } = await supabase
                 .from("certificate_templates")
                 .update({
-                placeholder_mapping: placeholderMapping,
-                updated_at: new Date().toISOString(),
-            })
+                    placeholder_mapping: placeholderMapping,
+                    updated_at: new Date().toISOString(),
+                })
                 .eq("id", templateId)
                 .select()
                 .single();
@@ -335,7 +334,7 @@ export const certificateController = {
                         console.log(`🎯 Generating PowerPoint certificate using template ${templateId} (will convert to PDF)`);
                         certificateBuffer =
                             await CertificateGenerator.generatePowerPointCertificate(template.file_path || "", // Fallback path for legacy templates
-                            certificateData, template.placeholder_mapping, templateId // Pass template ID for Azure storage lookup
+                                certificateData, template.placeholder_mapping, templateId // Pass template ID for Azure storage lookup
                             );
                         // Determine file extension based on buffer content (PDF conversion may fall back to PPTX)
                         // Check if buffer starts with PDF signature %PDF
@@ -518,8 +517,8 @@ export const certificateController = {
                 try {
                     // Send email with certificate and track who sent it
                     await CertificateGenerator.emailCertificate(certificate.registrations.email, certificate.registrations.name, certificate.events.title, certificate.certificate_url || certificate.file_url, // Use certificate_url if available, fallback to file_url
-                    certificate.certificate_code, certificate.verification_code, message ||
-                        `Congratulations! Your certificate for ${certificate.events.title} is ready.`, currentUserId // Pass the user who is sending the email
+                        certificate.certificate_code, certificate.verification_code, message ||
+                    `Congratulations! Your certificate for ${certificate.events.title} is ready.`, currentUserId // Pass the user who is sending the email
                     );
                     emailResults.push({
                         certificateId: certificate.id,

@@ -238,7 +238,7 @@ router.post("/upload", fileUploadRateLimit, authenticateToken, upload.single("te
             // Read file buffer from uploaded file
             const fileBuffer = await fs.readFile(uploadedFile.path);
             const newTemplate = await TemplateService.createTemplateWithAzure(eventId, templateName, fileBuffer, // Pass buffer instead of file path
-            uploadedFile.originalname, templateConfig);
+                uploadedFile.originalname, templateConfig);
             // Clean up local uploaded file immediately after reading
             try {
                 await fs.unlink(uploadedFile.path);
@@ -260,24 +260,23 @@ router.post("/upload", fileUploadRateLimit, authenticateToken, upload.single("te
             const { data: newTemplate, error: createError } = await supabase
                 .from("certificate_templates")
                 .insert({
-                event_id: eventId,
-                name: templateName,
-                type: "powerpoint", // Individual column
-                template: {
-                    file_path: uploadedFile.path,
-                    file_name: uploadedFile.originalname,
-                    type: "powerpoint",
-                    placeholders: extractedPlaceholders,
-                    placeholder_mapping: mapping,
-                    available_fields: AVAILABLE_DATA_FIELDS,
-                }, // JSONB column with template configuration
-                extracted_placeholders: extractedPlaceholders || [], // Individual column
-                placeholder_mapping: mapping || {}, // Individual column
-                template_data: {}, // Individual column
-                file_path: uploadedFile.path, // Individual column for local file path
-                uses_azure_storage: false, // Individual column for storage type
-                azure_url: null, // Individual column - null for local storage
-            })
+                    event_id: eventId,
+                    name: templateName,
+                    type: "powerpoint", // Individual column
+                    template: {
+                        file_path: uploadedFile.path,
+                        file_name: uploadedFile.originalname,
+                        type: "powerpoint",
+                        placeholders: extractedPlaceholders,
+                        placeholder_mapping: mapping,
+                        available_fields: AVAILABLE_DATA_FIELDS,
+                    }, // JSONB column with template configuration
+                    extracted_placeholders: extractedPlaceholders || [], // Individual column
+                    placeholder_mapping: mapping || {}, // Individual column
+                    file_path: uploadedFile.path, // Individual column for local file path
+                    uses_azure_storage: false, // Individual column for storage type
+                    azure_url: null, // Individual column - null for local storage
+                })
                 .select("*")
                 .single();
             if (createError) {

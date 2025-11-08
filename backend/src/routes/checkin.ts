@@ -92,20 +92,10 @@ router.post(
       console.log("👤 Existing user check result (admin):", existingUser);
 
       if (existingUser) {
-        // Send notification email to existing user
-        try {
-          await EmailService.sendStaffAssignmentNotification(
-            email,
-            name,
-            event.title,
-            `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`
-          );
-          console.log(`✅ Staff assignment notification sent to: ${email}`);
-        } catch (notifyError) {
-          console.error("📧 Notification email sending failed:", notifyError);
-        }
-        // User exists, check if already assigned to this event
-        console.log("🔍 User exists, checking assignment...");
+        staffUser = existingUser;
+        console.log("✅ User already exists, checking assignment...");
+
+        // Check if already assigned to this event
         const { data: existingAssignment } = await supabaseAdmin
           .from("event_users")
           .select("*")
@@ -123,10 +113,18 @@ router.post(
           });
         }
 
-        staffUser = existingUser;
-        console.log("✅ Using existing user");
-        // Do NOT attempt to create a new user if one already exists!
-        // Proceed to event_users insert only.
+        // Send notification email to existing user
+        try {
+          await EmailService.sendStaffAssignmentNotification(
+            email,
+            name,
+            event.title,
+            `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`
+          );
+          console.log(`✅ Staff assignment notification sent to: ${email}`);
+        } catch (notifyError) {
+          console.error("📧 Notification email sending failed:", notifyError);
+        }
       } else {
         // Create new user for staff member
         console.log("🔨 Creating new user...");
@@ -146,11 +144,11 @@ router.post(
 
         console.log("👤 User creation result:", { newUser, userError });
 
-        if (userError || !newUser) {
-          // If duplicate email error, fetch the user from supabaseAdmin and proceed
-          if (userError && userError.code === "23505") {
+        if (userError) {
+          // If duplicate email error, fetch the existing user and check assignment
+          if (userError.code === "23505") {
             console.log(
-              "⚠️ User already exists (duplicate email), fetching existing user from supabaseAdmin..."
+              "⚠️ User already exists (duplicate email), fetching existing user..."
             );
             const { data: adminExistingUser, error: adminUserFetchError } =
               await supabaseAdmin
@@ -158,6 +156,7 @@ router.post(
                 .select("*")
                 .eq("email", email)
                 .single();
+
             if (!adminExistingUser || adminUserFetchError) {
               console.log(
                 "❌ Could not fetch existing user after duplicate error"
@@ -167,8 +166,40 @@ router.post(
                 details: userError?.message,
               });
             }
+
+            // Check if user is already assigned to this event
+            const { data: existingAssignment } = await supabaseAdmin
+              .from("event_users")
+              .select("*")
+              .eq("user_id", adminExistingUser.id)
+              .eq("event_id", eventId)
+              .eq("role", "staff")
+              .single();
+
+            if (existingAssignment) {
+              console.log("❌ Staff already assigned to this event");
+              return res.status(400).json({
+                error: "Staff member already assigned to this event",
+              });
+            }
+
             staffUser = adminExistingUser;
-            // Optionally: send notification email if needed
+
+            // Send notification email to existing user
+            try {
+              await EmailService.sendStaffAssignmentNotification(
+                email,
+                name,
+                event.title,
+                `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`
+              );
+              console.log(`✅ Staff assignment notification sent to: ${email}`);
+            } catch (notifyError) {
+              console.error(
+                "📧 Notification email sending failed:",
+                notifyError
+              );
+            }
           } else {
             console.log("❌ User creation failed");
             return res.status(400).json({
@@ -176,50 +207,63 @@ router.post(
               details: userError?.message,
             });
           }
-        }
+        } else if (newUser) {
+          staffUser = newUser;
 
-        staffUser = newUser;
-
-        // Send email with login credentials
-        console.log("📧 Attempting to send staff credentials email to:", email);
-
-        // Check if user has granted Gmail permission for delegated sending
-        const freshTokenData = await getFreshAccessToken(userId);
-
-        if (freshTokenData) {
+          // Send email with login credentials
           console.log(
-            "🔑 Using user-delegated Gmail sending from:",
-            freshTokenData.email
-          );
-          console.log("🎫 Has access token:", !!freshTokenData.accessToken);
-          console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
-        } else {
-          console.log("⚠️ No user Gmail permission, using system email");
-        }
-
-        try {
-          const emailSent = await EmailService.sendStaffCredentials(
-            email,
-            name,
-            tempPassword,
-            event.title,
-            `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`,
-            freshTokenData?.email,
-            freshTokenData?.accessToken,
-            freshTokenData?.refreshToken
+            "📧 Attempting to send staff credentials email to:",
+            email
           );
 
-          if (emailSent) {
-            console.log(`✅ Staff credentials sent successfully to: ${email}`);
-          } else {
+          // Check if user has granted Gmail permission for delegated sending
+          const freshTokenData = await getFreshAccessToken(userId);
+
+          if (freshTokenData) {
             console.log(
-              `⚠️ Staff credentials could not be sent to: ${email} (but staff was created)`
+              "🔑 Using user-delegated Gmail sending from:",
+              freshTokenData.email
             );
+            console.log("🎫 Has access token:", !!freshTokenData.accessToken);
+            console.log("🔄 Has refresh token:", !!freshTokenData.refreshToken);
+          } else {
+            console.log("⚠️ No user Gmail permission, using system email");
           }
-        } catch (emailError) {
-          console.error("📧 Email sending failed:", emailError);
-          // Don't fail the whole operation if email fails
+
+          try {
+            const emailSent = await EmailService.sendStaffCredentials(
+              email,
+              name,
+              tempPassword,
+              event.title,
+              `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`,
+              freshTokenData?.email,
+              freshTokenData?.accessToken,
+              freshTokenData?.refreshToken
+            );
+
+            if (emailSent) {
+              console.log(
+                `✅ Staff credentials sent successfully to: ${email}`
+              );
+            } else {
+              console.log(
+                `⚠️ Staff credentials could not be sent to: ${email} (but staff was created)`
+              );
+            }
+          } catch (emailError) {
+            console.error("📧 Email sending failed:", emailError);
+            // Don't fail the whole operation if email fails
+          }
         }
+      }
+
+      // Ensure staffUser is set before proceeding
+      if (!staffUser) {
+        console.log("❌ Staff user not set");
+        return res.status(500).json({
+          error: "Failed to process staff user",
+        });
       }
 
       // Create staff assignment
@@ -369,7 +413,7 @@ router.get(
           user: staffUser,
           assigned_by_user: assignedByUser,
         };
-        console.log("✅ Transformed staff:", transformedStaff);
+        // console.log("✅ Transformed staff:", transformedStaff);
         staff.push(transformedStaff);
       }
 
@@ -455,15 +499,17 @@ router.get(
         .eq("event_id", eventId)
         .eq("status", "confirmed");
 
-      // Get total check-ins
+      // Get total check-ins (attendance table only contains checked-in participants)
       const { count: totalCheckIns } = await supabaseAdmin
         .from("attendance")
         .select("*", { count: "exact", head: true })
-        .eq("event_id", eventId)
-        .eq("status", "checked_in");
+        .eq("event_id", eventId);
 
-      // Get recent check-ins
-      const { data: recentCheckIns } = await supabaseAdmin
+      // Get check-ins - support optional 'all' parameter for attendance page
+      const getAllRecords = req.query.all === "true";
+      const limit = getAllRecords ? 1000 : 10; // Get up to 1000 records if 'all' is requested
+
+      const { data: recentCheckIns, error: recentError } = await supabaseAdmin
         .from("attendance")
         .select(
           `
@@ -474,15 +520,19 @@ router.get(
             name,
             email
           ),
-          checked_in_by:users!checked_in_by_id (
+          checked_in_by_user:users!checked_in_by (
             name
           )
         `
         )
         .eq("event_id", eventId)
-        .eq("status", "checked_in")
         .order("checked_in_at", { ascending: false })
-        .limit(10);
+        .limit(limit);
+
+      // console.log("📋 Recent check-ins query result:", {
+      //   recentCheckIns,
+      //   recentError,
+      // });
 
       const checkInRate =
         (totalRegistrations || 0) > 0
@@ -507,9 +557,14 @@ router.get(
             email: checkIn.registrations?.email || "Unknown",
           },
           checked_in_by_user: {
-            name: checkIn.checked_in_by?.name || "System",
+            name: checkIn.checked_in_by_user?.name || "System",
           },
         })) || [];
+
+      console.log(
+        "✅ Formatted recent check-ins:",
+        formattedRecentCheckIns.length
+      );
 
       // console.log("✅ Check-in stats retrieved successfully");
 

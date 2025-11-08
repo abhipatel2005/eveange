@@ -259,7 +259,7 @@ router.get("/events/:eventId/staff", authenticateToken, async (req, res) => {
                 user: staffUser,
                 assigned_by_user: assignedByUser,
             };
-            console.log("✅ Transformed staff:", transformedStaff);
+            // console.log("✅ Transformed staff:", transformedStaff);
             staff.push(transformedStaff);
         }
         // console.log("✅ Staff fetched successfully:", staff.length, "members");

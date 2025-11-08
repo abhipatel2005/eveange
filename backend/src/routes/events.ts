@@ -11,6 +11,9 @@ router.get("/:id", EventController.getEventById);
 // Protected routes (require authentication)
 router.use(authenticateToken);
 
+// Get user's role for a specific event
+router.get("/:id/user-role", EventController.getUserEventRole);
+
 // Organizer routes
 router.post("/", EventController.createEvent);
 router.put("/:id", requireOrganizer, EventController.updateEvent);

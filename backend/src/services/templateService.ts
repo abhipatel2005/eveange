@@ -214,7 +214,6 @@ export class TemplateService {
           uses_azure_storage: true, // Individual column for storage type
           extracted_placeholders: templateConfig.placeholders || [], // Individual column
           placeholder_mapping: templateConfig.placeholder_mapping || {}, // Individual column
-          template_data: templateConfig.template_data || {}, // Individual column
           file_path: null, // No local file path for Azure storage
         })
         .select("*")

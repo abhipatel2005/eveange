@@ -334,7 +334,6 @@ router.post(
             }, // JSONB column with template configuration
             extracted_placeholders: extractedPlaceholders || [], // Individual column
             placeholder_mapping: mapping || {}, // Individual column
-            template_data: {}, // Individual column
             file_path: uploadedFile.path, // Individual column for local file path
             uses_azure_storage: false, // Individual column for storage type
             azure_url: null, // Individual column - null for local storage

@@ -95,8 +95,17 @@ export class RegistrationController {
         return;
       }
 
-      // Check if user is the organizer (organizers can't register for their own events)
-      if (event.organizer_id === userId) {
+      // Check if user is an organizer for this event in event_users table
+      const { data: eventUser, error: eventUserError } = await supabase
+        .from("event_users")
+        .select("role")
+        .eq("event_id", eventId)
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .single();
+
+      // If user has organizer role for this event, they can't register as participant
+      if (!eventUserError && eventUser && eventUser.role === "organizer") {
         res.status(403).json({
           success: false,
           error: "Organizers cannot register for their own events",
@@ -343,7 +352,7 @@ export class RegistrationController {
         return;
       }
 
-      // Check if user is the organizer or admin
+      // Check if user is the organizer (only event owner can view registrations)
       const { data: event, error: eventError } = await supabase
         .from("events")
         .select("organizer_id")
@@ -358,7 +367,8 @@ export class RegistrationController {
         return;
       }
 
-      if (userRole !== "admin" && event.organizer_id !== userId) {
+      // Only the event owner can view registrations
+      if (event.organizer_id !== userId) {
         res.status(403).json({
           success: false,
           error: "You can only view registrations for your own events",

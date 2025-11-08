@@ -166,19 +166,21 @@ export class UserController {
 
       // Determine what the user can access
       const hasStaffAssignments = eventUsers && eventUsers.length > 0;
-      const canAccessCertificates = eventUsers?.some(
-        (eu: any) =>
-          eu.role === "organizer" ||
-          eu.permissions?.includes("manage-certificates") ||
-          eu.permissions?.includes("view-certificates")
-      ) || false;
+      const canAccessCertificates =
+        eventUsers?.some(
+          (eu: any) =>
+            eu.role === "organizer" ||
+            eu.permissions?.includes("manage-certificates") ||
+            eu.permissions?.includes("view-certificates")
+        ) || false;
 
-      const canScanQR = eventUsers?.some(
-        (eu: any) =>
-          eu.role === "organizer" ||
-          eu.role === "staff" ||
-          eu.permissions?.includes("check-in")
-      ) || false;
+      const canScanQR =
+        eventUsers?.some(
+          (eu: any) =>
+            eu.role === "organizer" ||
+            eu.role === "staff" ||
+            eu.permissions?.includes("check-in")
+        ) || false;
 
       res.status(200).json({
         success: true,

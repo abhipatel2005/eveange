@@ -211,7 +211,6 @@ export const certificateController = {
               }, // JSONB column with template configuration
               extracted_placeholders: placeholders || [], // Individual column
               placeholder_mapping: placeholderMapping || {}, // Individual column
-              template_data: templateData || {}, // Individual column
               file_path: filePath, // Individual column for local file path
               uses_azure_storage: false, // Individual column for storage type
               azure_url: null, // Individual column - null for local storage

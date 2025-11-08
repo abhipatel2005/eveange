@@ -188,7 +188,6 @@ export interface CertificateTemplate {
   name: string;
   type: "canvas" | "powerpoint";
   file_path?: string;
-  template_data: any;
   placeholder_mapping: PlaceholderMapping;
   created_at: string;
   updated_at: string;
