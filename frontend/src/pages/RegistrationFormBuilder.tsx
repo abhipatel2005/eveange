@@ -787,7 +787,7 @@ export default function RegistrationFormBuilder() {
               </div>
             </div>
 
-            {/* Field Editor Sidebar */}
+            {/* Field Editor Sidebar - Sticky */}
             <div className="lg:col-span-1">
               {activeFieldId &&
                 (() => {
@@ -797,7 +797,7 @@ export default function RegistrationFormBuilder() {
                   if (!activeField) return null;
 
                   return (
-                    <div className="bg-white rounded-lg shadow-sm border p-4">
+                    <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-24 max-h-[80vh] overflow-y-auto">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium text-gray-900">
                           Edit Field
@@ -868,20 +868,56 @@ export default function RegistrationFormBuilder() {
                           activeField.type === "checkbox") && (
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Options (one per line)
+                              Options
                             </label>
-                            <textarea
-                              value={(activeField.options || []).join("\n")}
-                              onChange={(e) => {
-                                const options = e.target.value
-                                  .split("\n")
-                                  .filter((opt) => opt.trim() !== "");
-                                updateField(activeFieldId, { options });
-                              }}
-                              rows={4}
-                              className="w-full p-2 border border-gray-300 rounded-md"
-                              placeholder="Option 1&#10;Option 2&#10;Option 3"
-                            />
+                            <div className="space-y-2">
+                              {(activeField.options || []).map((opt, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2"
+                                >
+                                  <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const options = [
+                                        ...(activeField.options || []),
+                                      ];
+                                      options[idx] = e.target.value;
+                                      updateField(activeFieldId, { options });
+                                    }}
+                                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="text-red-500 px-2 py-1 rounded hover:bg-red-50"
+                                    onClick={() => {
+                                      const options = [
+                                        ...(activeField.options || []),
+                                      ];
+                                      options.splice(idx, 1);
+                                      updateField(activeFieldId, { options });
+                                    }}
+                                    title="Remove option"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                className="w-full mt-2 py-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200"
+                                onClick={() => {
+                                  const options = [
+                                    ...(activeField.options || []),
+                                    "",
+                                  ];
+                                  updateField(activeFieldId, { options });
+                                }}
+                              >
+                                Add Option
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

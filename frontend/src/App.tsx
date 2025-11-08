@@ -78,7 +78,7 @@ function App() {
         <Route
           path="/events/:id/registrations"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute>
               <EventRegistrationsPage />
             </ProtectedRoute>
           }
@@ -86,7 +86,7 @@ function App() {
         <Route
           path="/events/:id/attendance"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute>
               <AttendancePage />
             </ProtectedRoute>
           }
@@ -94,7 +94,7 @@ function App() {
         <Route
           path="/certificates"
           element={
-            <ProtectedRoute requireOrganizer allowStaff>
+            <ProtectedRoute>
               <CertificatesListPage />
             </ProtectedRoute>
           }
@@ -102,7 +102,7 @@ function App() {
         <Route
           path="/certificates/:id"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute>
               <CertificateManagementPage />
             </ProtectedRoute>
           }
@@ -110,7 +110,7 @@ function App() {
         <Route
           path="/events/:id/certificates"
           element={
-            <ProtectedRoute requireOrganizer>
+            <ProtectedRoute>
               <CertificateManagementPage />
             </ProtectedRoute>
           }

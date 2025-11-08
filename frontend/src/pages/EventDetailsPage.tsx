@@ -19,22 +19,23 @@ import {
   Coffee,
   CheckCircle2,
   Share2,
+  Plus,
 } from "lucide-react";
 
 const EventDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
   const [event, setEvent] = useState<Event | null>(null);
   const [userRegistrations, setUserRegistrations] = useState<Registration[]>(
     []
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "about" | "speakers" | "schedule" | "sponsors"
   >("about");
+  const [userEventRole, setUserEventRole] = useState<string | null>(null);
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -46,6 +47,29 @@ const EventDetailsPage: React.FC = () => {
     } catch (err) {
       if (import.meta.env.DEV) {
         console.error("Failed to fetch user registrations:", err);
+      }
+    }
+  };
+
+  const fetchUserEventRole = async () => {
+    if (!user || !id || !accessToken) return;
+
+    try {
+      const response = await fetch(`/api/events/${id}/user-role`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setUserEventRole(result.data.role);
+        }
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Failed to fetch user event role:", err);
       }
     }
   };
@@ -151,7 +175,8 @@ const EventDetailsPage: React.FC = () => {
 
     fetchEvent();
     fetchUserRegistrations();
-  }, [id, user]);
+    fetchUserEventRole();
+  }, [id, user, accessToken]);
 
   const handleDelete = async () => {
     if (!event || !id) return;
@@ -210,9 +235,8 @@ const EventDetailsPage: React.FC = () => {
     );
   }
 
-  const isEventOrganizer =
-    user && event.organizer && user.id === event.organizer.id;
-  const canManage = isEventOrganizer || user?.role === "admin";
+  // Check if user is organizer for this event based on event_users table
+  const canManage = userEventRole === "organizer";
   const startDate = new Date(event.start_date);
   const endDate = new Date(event.end_date);
   const isUpcoming = startDate > new Date();
@@ -524,6 +548,13 @@ const EventDetailsPage: React.FC = () => {
                   <Award className="w-4 h-4" />
                   <span>Certificates</span>
                 </Link>
+                <Link
+                  to={`/events/${event.id}/form-builder`}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm font-medium shadow-sm border border-primary-200"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create Registration Form</span>
+                </Link>
               </div>
             </div>
           </div>
@@ -567,24 +598,6 @@ const EventDetailsPage: React.FC = () => {
                     </span>
                   </li>
                 </ul>
-
-                {/* Map will be added when coordinates are available */}
-                {showMap && (
-                  <div className="mt-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                      Location
-                    </h3>
-                    <div className="bg-gray-100 rounded-xl p-8 text-center border border-gray-200">
-                      <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-700 font-medium">
-                        {event.location}
-                      </p>
-                      <p className="text-gray-500 text-sm mt-2">
-                        Map view coming soon
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -635,11 +648,16 @@ const EventDetailsPage: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowMap(!showMap)}
+                    onClick={() => {
+                      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        event.location
+                      )}`;
+                      window.open(mapUrl, "_blank");
+                    }}
                     className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                   >
                     <MapPin className="w-4 h-4 mr-2" />
-                    {showMap ? "Hide Map" : "View on Map"}
+                    View on Google Maps
                   </button>
                 </div>
               </div>

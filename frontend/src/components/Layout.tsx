@@ -23,11 +23,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { permissions } = useUserPermissions();
-  
+
   // For dynamic nav: get event/registration/staff state from DashboardPage logic
   // We'll use localStorage (populated by dashboard) as a simple cross-component comms for now
   const [hasRegistrations, setHasRegistrations] = React.useState(false);
-  
+
   React.useEffect(() => {
     // Listen for dashboard updates (set in DashboardPage)
     const reg = localStorage.getItem("dashboard_has_registrations");
@@ -56,7 +56,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     user?.role === "admin" ||
     permissions?.hasStaffAssignments ||
     permissions?.canScanQR;
-    
+
   const canAccessCertificates =
     user?.role === "organizer" ||
     user?.role === "admin" ||

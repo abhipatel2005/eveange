@@ -85,6 +85,8 @@ export interface GetEventsParams {
   organizerId?: string;
   search?: string;
   upcoming?: boolean;
+  free?: boolean;
+  week?: boolean;
 }
 
 export const EventService = {
@@ -110,6 +112,8 @@ export const EventService = {
     if (params?.search) queryParams.append("search", params.search);
     if (params?.upcoming)
       queryParams.append("upcoming", params.upcoming.toString());
+    if (params?.free) queryParams.append("free", params.free.toString());
+    if (params?.week) queryParams.append("week", params.week.toString());
 
     const url = queryParams.toString()
       ? `/events?${queryParams.toString()}`

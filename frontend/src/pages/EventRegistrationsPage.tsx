@@ -269,7 +269,9 @@ const EventRegistrationsPage: React.FC = () => {
                     <div className="ml-4 flex-1 min-w-0">
                       <div className="flex items-center space-x-3">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {registration.user?.name || "Unknown User"}
+                          {registration.name ||
+                            registration.user?.name ||
+                            "Unknown User"}
                         </p>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
@@ -283,7 +285,9 @@ const EventRegistrationsPage: React.FC = () => {
                       <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
                         <div className="flex items-center">
                           <Mail className="h-4 w-4 mr-1" />
-                          {registration.user?.email || "No email"}
+                          {registration.email ||
+                            registration.user?.email ||
+                            "No email"}
                         </div>
                         {registration.user?.phone_number && (
                           <div className="flex items-center">

@@ -18,6 +18,7 @@ const EventsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showUpcomingOnly, setShowUpcomingOnly] = useState(true);
+  const [filterMode, setFilterMode] = useState<"all" | "free" | "week">("all");
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -44,6 +45,8 @@ const EventsPage: React.FC = () => {
         limit: 12,
         search: searchTerm || undefined,
         upcoming: showUpcomingOnly,
+        free: filterMode === "free" ? true : undefined,
+        week: filterMode === "week" ? true : undefined,
       });
 
       if (response.success && response.data) {
@@ -60,7 +63,7 @@ const EventsPage: React.FC = () => {
   useEffect(() => {
     fetchEvents();
     fetchUserRegistrations();
-  }, [page, showUpcomingOnly, user]);
+  }, [page, showUpcomingOnly, filterMode, user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,8 +202,8 @@ const EventsPage: React.FC = () => {
             </div> */}
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
-              {/* {user && (
+            {/* <div className="flex gap-3">
+              {user && (
                 <Link
                   to="/my-registrations"
                   className="inline-flex items-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -208,7 +211,7 @@ const EventsPage: React.FC = () => {
                   <Eye className="w-4 h-4 mr-2" />
                   My Events
                 </Link>
-              )} */}
+              )}
 
               {user && (user.role === "organizer" || user.role === "admin") && (
                 <Link
@@ -219,7 +222,7 @@ const EventsPage: React.FC = () => {
                   Create Event
                 </Link>
               )}
-            </div>
+            </div> */}
           </div>
 
           {/* Filters Section - Below title */}
@@ -259,34 +262,49 @@ const EventsPage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
+                  setFilterMode("all");
                   setSearchTerm("");
                   setShowUpcomingOnly(true);
                   setPage(1);
                   fetchEvents();
                 }}
-                className="text-sm px-4 py-2 bg-primary-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className={`text-sm px-4 py-2 rounded-lg transition-colors ${
+                  filterMode === "all"
+                    ? "bg-primary-600 text-white"
+                    : "bg-primary-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 All Events
               </button>
               <button
                 onClick={() => {
+                  setFilterMode("free");
                   setSearchTerm("");
                   setShowUpcomingOnly(true);
                   setPage(1);
                   fetchEvents();
                 }}
-                className="text-sm px-4 py-2 bg-green-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className={`text-sm px-4 py-2 rounded-lg transition-colors ${
+                  filterMode === "free"
+                    ? "bg-green-600 text-white"
+                    : "bg-green-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 Free Events
               </button>
               <button
                 onClick={() => {
+                  setFilterMode("week");
                   setSearchTerm("");
                   setShowUpcomingOnly(true);
                   setPage(1);
                   fetchEvents();
                 }}
-                className="text-sm px-4 py-2 bg-purple-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className={`text-sm px-4 py-2 rounded-lg transition-colors ${
+                  filterMode === "week"
+                    ? "bg-purple-600 text-white"
+                    : "bg-purple-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 This Week
               </button>

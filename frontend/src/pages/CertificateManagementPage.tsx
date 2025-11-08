@@ -16,7 +16,6 @@ interface CertificateTemplate {
   name: string;
   type: "canvas" | "powerpoint";
   file_path?: string;
-  template_data: any;
   placeholder_mapping: Record<string, string>;
   extracted_placeholders?: string[];
   created_at: string;

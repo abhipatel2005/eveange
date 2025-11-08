@@ -42,7 +42,7 @@ export function useUserPermissions() {
         const result = await response.json();
         if (result.success) {
           setPermissions(result.data);
-          
+
           // Update localStorage for backward compatibility
           localStorage.setItem(
             "dashboard_has_staff",
