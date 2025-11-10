@@ -17,7 +17,16 @@ export interface StaffEvent {
 }
 
 export const StaffService = {
-  async getAssignedEvents(): Promise<ApiResponse<{ events: StaffEvent[] }>> {
-    return apiClient.get("/staff/assigned-events");
+  async getAssignedEvents(options?: {
+    limit?: number;
+  }): Promise<ApiResponse<{ events: StaffEvent[] }>> {
+    const params = new URLSearchParams();
+    if (options?.limit) {
+      params.append("limit", options.limit.toString());
+    }
+    const url = params.toString()
+      ? `/staff/assigned-events?${params.toString()}`
+      : "/staff/assigned-events";
+    return apiClient.get(url);
   },
 };

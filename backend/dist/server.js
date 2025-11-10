@@ -12,6 +12,7 @@ import userRoutes from "./routes/users.js";
 import eventRoutes from "./routes/events.js";
 import registrationRoutes from "./routes/registrations.js";
 import registrationFormRoutes from "./routes/registrationForms.js";
+import formRoutes from "./routes/forms.js"; // New forms route
 import attendanceRoutes from "./routes/attendance.js";
 import certificateRoutes from "./routes/certificates.js";
 import templateRoutes from "./routes/templates.js";
@@ -31,7 +32,7 @@ const PORT = process.env.PORT || 3001;
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 150, // Limit each IP to 100 requests per windowMs
     message: {
         error: "Too many requests from this IP, please try again later.",
     },
@@ -115,7 +116,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/registrations", registrationRoutes);
-app.use("/api/registration-forms", registrationFormRoutes);
+app.use("/api/registration-forms", registrationFormRoutes); // Kept for backward compatibility
+app.use("/api/forms", formRoutes); // New unified forms endpoint
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/templates", templateRoutes);

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { CheckCircle, XCircle, Mail, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, Mail } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { Loader } from "../components/common/Loader";
 
 const EmailVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -160,7 +161,7 @@ const EmailVerificationPage: React.FC = () => {
       case "loading":
         return (
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <Loader size="xl" className="mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               Verifying Your Email
             </h1>
@@ -220,7 +221,7 @@ const EmailVerificationPage: React.FC = () => {
                       className="px-4 py-2 bg-yellow-600 text-white rounded-md text-sm hover:bg-yellow-700 disabled:opacity-50 flex items-center gap-2"
                     >
                       {isResending && (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <Loader size="xs" className="border-white" />
                       )}
                       Resend
                     </button>

@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
 import { Link } from "react-router-dom";
 import { Users, Calendar, Settings, BarChart3 } from "lucide-react";
+import { truncateText, isTruncated } from "../utils/textUtils";
 
 interface Event {
   id: string;
@@ -173,20 +174,36 @@ export function AdminDashboard() {
               {events.map((event) => (
                 <div key={event.id} className="p-6">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-medium text-gray-900">
-                        {event.title}
+                    <div className="flex-1 min-w-0">
+                      <h4
+                        className="text-lg font-medium text-gray-900 truncate"
+                        title={
+                          isTruncated(event.title, 60) ? event.title : undefined
+                        }
+                      >
+                        {truncateText(event.title, 60)}
                       </h4>
-                      <div className="mt-1 text-sm text-gray-600">
+                      <div className="mt-1 text-sm text-gray-600 space-y-1">
                         <p>
                           📅 {new Date(event.start_date).toLocaleDateString()}
                         </p>
-                        <p>📍 {event.location}</p>
-                        <p>👤 Organizer: {event.organizer.name}</p>
+                        <p
+                          className="truncate group relative cursor-help"
+                          title={
+                            isTruncated(event.location, 50)
+                              ? event.location
+                              : undefined
+                          }
+                        >
+                          📍 {truncateText(event.location, 50)}
+                        </p>
+                        <p className="truncate">
+                          👤 Organizer: {event.organizer.name}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex space-x-3">
+                    <div className="flex space-x-3 flex-shrink-0">
                       <Link
                         to={`/events/${event.id}`}
                         className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"

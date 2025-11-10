@@ -13,11 +13,13 @@ import EventDetailsPage from "./pages/EventDetailsPage";
 import RegistrationFormPage from "./pages/RegistrationFormPage";
 import RegistrationFormBuilder from "./pages/RegistrationFormBuilder";
 import MyRegistrationsPage from "./pages/MyRegistrationsPage";
+import MyEventsPage from "./pages/MyEventsPage";
 import EventRegistrationsPage from "./pages/EventRegistrationsPage";
 import AttendancePage from "./pages/AttendancePage";
 import CertificateManagementPage from "./pages/CertificateManagementPage";
 import CertificatesListPage from "./pages/CertificatesListPage";
 import CertificateVerificationPage from "./pages/CertificateVerificationPage";
+import FeedbackResponsesPage from "./pages/FeedbackResponsesPage";
 import CheckInPage from "./pages/CheckInPage";
 import ParticipantTicketPage from "./pages/ParticipantTicketPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -52,6 +54,14 @@ function App() {
           }
         />
         <Route
+          path="/my-events/:role"
+          element={
+            <ProtectedRoute>
+              <MyEventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/events/create"
           element={
             <ProtectedRoute>
@@ -72,6 +82,14 @@ function App() {
           element={
             <ProtectedRoute requireOrganizer>
               <RegistrationFormBuilder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:id/feedback-responses"
+          element={
+            <ProtectedRoute requireOrganizer>
+              <FeedbackResponsesPage />
             </ProtectedRoute>
           }
         />

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { RegistrationForm, FormField } from "../../api/registrationForms";
+import type { Form, FormField } from "../../api/forms";
 
 interface FormPreviewProps {
-  form: RegistrationForm;
+  form: Form;
 }
 
 export function FormPreview({ form }: FormPreviewProps) {

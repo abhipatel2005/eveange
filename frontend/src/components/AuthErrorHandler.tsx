@@ -28,10 +28,8 @@ export const AuthErrorHandler: React.FC<AuthErrorHandlerProps> = ({
       // Set a user-friendly error message
       setError("Your session has expired. Please log in again.");
 
-      // Redirect to login page
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
+      // Redirect to login page immediately
+      navigate("/login", { replace: true });
     }
   }, [error, clearAuth, setError, navigate]);
 
@@ -87,9 +85,8 @@ export const useApiErrorHandler = () => {
       clearAuth();
       setError("Your session has expired. Please log in again.");
 
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 1500);
+      // Redirect immediately
+      navigate("/login", { replace: true });
 
       return "Your session has expired. Redirecting to login...";
     }

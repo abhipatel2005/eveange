@@ -13,8 +13,8 @@ import {
   MapPin,
   User,
   Mail,
-  Loader,
 } from "lucide-react";
+import { Loader } from "../components/common/Loader";
 
 export default function CertificateVerificationPage() {
   const [certificateCode, setCertificateCode] = useState("");
@@ -102,7 +102,7 @@ export default function CertificateVerificationPage() {
                   className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   {loading ? (
-                    <Loader className="h-5 w-5 animate-spin" />
+                    <Loader size="xs" className="border-white" />
                   ) : (
                     <>
                       <Search className="h-5 w-5 mr-2" />

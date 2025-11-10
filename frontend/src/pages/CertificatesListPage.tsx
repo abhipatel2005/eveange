@@ -5,12 +5,11 @@ import {
   Calendar,
   Users,
   MapPin,
-  CheckCircle,
   Clock,
   AlertCircle,
-  Loader,
 } from "lucide-react";
 import { apiClient } from "@/api/client";
+import { Loader } from "../components/common/Loader";
 
 interface Event {
   id: string;
@@ -55,10 +54,7 @@ const CertificatesListPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading events...</p>
-        </div>
+        <Loader size="lg" text="Loading events..." />
       </div>
     );
   }
@@ -119,7 +115,7 @@ const CertificatesListPage: React.FC = () => {
                 >
                   <div className="p-6">
                     {/* Event Status Badge */}
-                    <div className="flex items-center justify-between mb-4">
+                    {/* <div className="flex items-center justify-between mb-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           hasEnded
@@ -144,7 +140,7 @@ const CertificatesListPage: React.FC = () => {
                           {event.certificates_generated} certificates
                         </span>
                       )}
-                    </div>
+                    </div> */}
 
                     {/* Event Title */}
                     <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">

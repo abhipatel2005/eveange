@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Navigate, useNavigate } from "react-router-dom";
 import QRVisual from "../components/checkin/QRVisual";
 import { useAuth } from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
+import { Loader } from "../components/common/Loader";
+import { ShareEventModal } from "../components/events/ShareEventModal";
 import {
-  ArrowLeft,
   Calendar,
   MapPin,
   Clock,
@@ -12,7 +13,8 @@ import {
   Printer,
   CheckCircle2,
   Mail,
-  User as UserIcon,
+  UserIcon as UserIcon,
+  ArrowLeft,
 } from "lucide-react";
 
 interface Registration {
@@ -36,11 +38,13 @@ export function ParticipantTicketPage() {
   const { registrationId } = useParams<{
     registrationId: string;
   }>();
+  const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const { accessToken } = useAuthStore();
   const [registration, setRegistration] = useState<Registration | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     if (registrationId && accessToken) {
@@ -88,10 +92,7 @@ export function ParticipantTicketPage() {
   if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your ticket...</p>
-        </div>
+        <Loader size="lg" text="Loading your ticket..." />
       </div>
     );
   }
@@ -115,11 +116,11 @@ export function ParticipantTicketPage() {
               "The ticket you're looking for doesn't exist or you don't have permission to view it."}
           </p>
           <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Go Back
+            <ArrowLeft className="w-4 h-4" />
+            <span>Go Back</span>
           </button>
         </div>
       </div>
@@ -150,8 +151,7 @@ export function ParticipantTicketPage() {
 
   // actions
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Link copied to clipboard!");
+    setShowShareModal(true);
   };
 
   const handlePrint = () => {
@@ -388,6 +388,15 @@ export function ParticipantTicketPage() {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && registration && (
+        <ShareEventModal
+          eventId={registration.event.id}
+          eventTitle={registration.event.title}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 }

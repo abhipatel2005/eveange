@@ -265,7 +265,9 @@ export class RegistrationController {
           // Prepare email template data
           const eventDate = new Date(event.start_date).toLocaleDateString();
           const eventTime = new Date(event.start_date).toLocaleTimeString();
-          const ticketUrl = `https://eventbase.abhipatel.site/ticket/${registration.id}`;
+          const frontendUrl =
+            process.env.FRONTEND_URL || "http://localhost:5173";
+          const ticketUrl = `${frontendUrl}/ticket/${registration.id}`;
 
           const emailData: EmailTemplateData = {
             participantName: registration.name || "Participant",
@@ -459,7 +461,12 @@ export class RegistrationController {
         return;
       }
 
-      const { data: registrations, error } = await supabase
+      // Get optional limit parameter from query
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string)
+        : undefined;
+
+      let query = supabase
         .from("registrations")
         .select(
           `
@@ -472,6 +479,13 @@ export class RegistrationController {
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
+
+      // Apply limit if provided
+      if (limit && limit > 0) {
+        query = query.limit(limit);
+      }
+
+      const { data: registrations, error } = await query;
 
       if (error) {
         console.error("Get user registrations error:", error);

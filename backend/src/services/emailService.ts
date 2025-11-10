@@ -1063,10 +1063,13 @@ export class EmailService {
     userAccessToken?: string,
     userRefreshToken?: string
   ): Promise<boolean> {
+    // Get frontend URL from environment
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
     // Get certificate attachment from Azure Blob Storage
     let certificateAttachment = null;
 
-    console.log(`🔍 Certificate URL received: ${certificateUrl}`);
+    // console.log(`🔍 Certificate URL received: ${certificateUrl}`);
 
     if (
       certificateUrl &&
@@ -1074,7 +1077,7 @@ export class EmailService {
         certificateUrl.includes("sig="))
     ) {
       try {
-        console.log(`📎 Downloading certificate from Azure for attachment...`);
+        // console.log(`📎 Downloading certificate from Azure for attachment...`);
 
         // Extract filename from Azure URL (handle both regular and SAS URLs)
         const urlParts = certificateUrl.split("/");
@@ -1168,7 +1171,8 @@ export class EmailService {
         eventTitle,
         certificateCode,
         verificationCode,
-        customMessage
+        customMessage,
+        frontendUrl
       );
 
       const fromEmail =
@@ -1226,7 +1230,8 @@ export class EmailService {
             eventTitle,
             certificateCode,
             verificationCode,
-            customMessage
+            customMessage,
+            frontendUrl
           );
 
           await sendEmailViaGmailAPI(
@@ -1263,8 +1268,12 @@ export class EmailService {
     eventTitle: string,
     certificateCode: string,
     verificationCode: string,
-    customMessage?: string
+    customMessage?: string,
+    frontendUrl?: string
   ): string {
+    const baseUrl =
+      frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
+
     return `
       <!DOCTYPE html>
     <html lang="en">
@@ -1371,8 +1380,8 @@ export class EmailService {
                   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 35px;">
                     <tr>
                       <td align="center">
-                        <a href="#" style="display: inline-block; background: #fbbf24; color: #1e293b; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
-                          Verify Certificate
+                        <a href="${baseUrl}/dashboard" style="display: inline-block; background: #fbbf24; color: #1e293b; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                          View Dashboard
                         </a>
                       </td>
                     </tr>

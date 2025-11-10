@@ -89,6 +89,9 @@ export function getErrorMessage(
         return errorResponse || "This action conflicts with existing data.";
 
       case 429:
+        if (errorResponse.includes("Rate limit")) {
+          return errorResponse; // Already has good message from client
+        }
         return "Too many requests. Please wait a moment and try again.";
 
       case 500:

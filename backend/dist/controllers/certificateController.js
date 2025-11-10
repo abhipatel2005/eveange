@@ -5,6 +5,31 @@ import fs from "fs/promises";
 import { CertificateGenerator, AVAILABLE_DATA_FIELDS, } from "../services/certificateGenerator.js";
 import { TemplateService } from "../services/templateService.js";
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+// Helper function to check if user has permission to manage certificates for an event
+async function hasCertificatePermission(userId, eventId) {
+    // Check if user is the event organizer
+    const { data: event } = await supabase
+        .from("events")
+        .select("organizer_id")
+        .eq("id", eventId)
+        .single();
+    if (event && event.organizer_id === userId) {
+        return true;
+    }
+    // Check if user is staff with create-certificate permission
+    const { data: staffAssignment } = await supabase
+        .from("event_users")
+        .select("permissions")
+        .eq("user_id", userId)
+        .eq("event_id", eventId)
+        .eq("role", "staff")
+        .single();
+    if (staffAssignment) {
+        const permissions = staffAssignment.permissions || [];
+        return permissions.includes("create-certificate");
+    }
+    return false;
+}
 // Configure multer for template uploads
 const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
@@ -254,6 +279,15 @@ export const certificateController = {
     getEligibleParticipants: async (req, res) => {
         try {
             const { eventId } = req.params;
+            const userId = req.user.id;
+            // Check if user has permission to manage certificates for this event
+            const hasPermission = await hasCertificatePermission(userId, eventId);
+            if (!hasPermission) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to manage certificates for this event",
+                });
+            }
             const participants = await CertificateGenerator.getEligibleParticipants(eventId);
             res.json({
                 success: true,
@@ -276,6 +310,15 @@ export const certificateController = {
         try {
             const { eventId } = req.params;
             const { templateId, participantIds } = req.body;
+            const userId = req.user.id;
+            // Check if user has permission to manage certificates for this event
+            const hasPermission = await hasCertificatePermission(userId, eventId);
+            if (!hasPermission) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to generate certificates for this event",
+                });
+            }
             if (!templateId) {
                 return res.status(400).json({
                     success: false,
@@ -419,10 +462,19 @@ export const certificateController = {
     getCertificates: async (req, res) => {
         try {
             const { eventId } = req.params;
+            const userId = req.user.id;
             if (!eventId) {
                 return res.status(400).json({
                     success: false,
                     message: "Event ID is required",
+                });
+            }
+            // Check if user has permission to view certificates for this event
+            const hasPermission = await hasCertificatePermission(userId, eventId);
+            if (!hasPermission) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to view certificates for this event",
                 });
             }
             // Get all certificates for the event with participant details
@@ -470,10 +522,19 @@ export const certificateController = {
         try {
             const { eventId } = req.params;
             const { certificateIds, message } = req.body; // Optional: specific certificates to email
+            const userId = req.user.id;
             if (!eventId) {
                 return res.status(400).json({
                     success: false,
                     message: "Event ID is required",
+                });
+            }
+            // Check if user has permission to manage certificates for this event
+            const hasPermission = await hasCertificatePermission(userId, eventId);
+            if (!hasPermission) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to email certificates for this event",
                 });
             }
             // Get certificates to email
@@ -569,8 +630,8 @@ export const certificateController = {
         try {
             const userId = req.user.id;
             const now = new Date().toISOString();
-            // Get events that have ended and belong to the user
-            const { data: events, error } = await supabase
+            // Get events that have ended and belong to the user as organizer
+            const { data: ownedEvents, error: ownedError } = await supabase
                 .from("events")
                 .select(`
           id,
@@ -584,15 +645,47 @@ export const certificateController = {
                 .eq("organizer_id", userId)
                 .lt("end_date", now) // Only past events
                 .order("end_date", { ascending: false });
-            if (error) {
-                console.error("Database error:", error);
+            if (ownedError) {
+                console.error("Database error fetching owned events:", ownedError);
                 return res.status(500).json({
                     success: false,
                     error: "Failed to fetch events",
                 });
             }
+            // Get events where user is staff with certificate creation permission
+            const { data: staffAssignments, error: staffError } = await supabase
+                .from("event_users")
+                .select(`
+          event_id,
+          permissions,
+          events:events!inner(
+            id,
+            title,
+            description,
+            start_date,
+            end_date,
+            location,
+            registrations:registrations(count)
+          )
+        `)
+                .eq("user_id", userId)
+                .eq("role", "staff")
+                .lt("events.end_date", now); // Only past events
+            if (staffError) {
+                console.error("Database error fetching staff events:", staffError);
+            }
+            // Filter staff events to only include those with create-certificate permission
+            const staffEvents = (staffAssignments || [])
+                .filter((assignment) => {
+                const permissions = assignment.permissions || [];
+                return permissions.includes("create-certificate");
+            })
+                .map((assignment) => assignment.events);
+            // Combine owned events and staff events, removing duplicates
+            const allEvents = [...(ownedEvents || []), ...(staffEvents || [])];
+            const uniqueEvents = allEvents.filter((event, index, self) => index === self.findIndex((e) => e.id === event.id));
             // Format the response to include registration count
-            const formattedEvents = (events || []).map((event) => ({
+            const formattedEvents = uniqueEvents.map((event) => ({
                 ...event,
                 status: "completed", // Set status as completed for past events
                 registrations_count: Array.isArray(event.registrations)
@@ -616,6 +709,15 @@ export const certificateController = {
     getEventCertificates: async (req, res) => {
         try {
             const { eventId } = req.params;
+            const userId = req.user.id;
+            // Check if user has permission to view certificates for this event
+            const hasPermission = await hasCertificatePermission(userId, eventId);
+            if (!hasPermission) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to view certificates for this event",
+                });
+            }
             const { data, error } = await supabase
                 .from("certificates")
                 .select(`

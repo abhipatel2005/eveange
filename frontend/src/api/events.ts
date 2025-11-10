@@ -140,7 +140,16 @@ export const EventService = {
   },
 
   // Get events for the authenticated organizer
-  async getMyEvents(): Promise<ApiResponse<{ events: Event[] }>> {
-    return apiClient.get("/events/my/events");
+  async getMyEvents(options?: {
+    limit?: number;
+  }): Promise<ApiResponse<{ events: Event[] }>> {
+    const params = new URLSearchParams();
+    if (options?.limit) {
+      params.append("limit", options.limit.toString());
+    }
+    const url = params.toString()
+      ? `/events/my/events?${params.toString()}`
+      : "/events/my/events";
+    return apiClient.get(url);
   },
 };

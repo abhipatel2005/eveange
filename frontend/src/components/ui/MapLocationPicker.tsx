@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Search, X } from "lucide-react";
+import { Loader } from "../common/Loader";
 
 interface LocationData {
   address: string;
@@ -229,7 +230,7 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         {/* Loading indicator */}
         {isLoading && (
           <div className="absolute inset-y-0 right-8 flex items-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+            <Loader size="xs" />
           </div>
         )}
       </div>

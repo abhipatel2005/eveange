@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { RegistrationForm, FormField } from "../../api/registrationForms";
+import type { Form, FormField } from "../../api/forms";
 
 interface RegistrationFormRendererProps {
-  form: RegistrationForm;
+  form: Form;
   onDataChange: (data: Record<string, any>) => void;
   initialData?: Record<string, any>;
 }

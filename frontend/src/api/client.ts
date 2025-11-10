@@ -37,12 +37,16 @@ export class ApiClient {
     const url = `${this.baseURL}${endpoint}`;
     const rateLimitKey = `${options.method || "GET"}:${endpoint}`;
 
-    // Check rate limit
+    // Check rate limit (client-side only - no toast)
     if (!apiRateLimiter.isAllowed(rateLimitKey)) {
-      const remaining = apiRateLimiter.getRemainingRequests(rateLimitKey);
+      const resetTime = apiRateLimiter.getResetTime(rateLimitKey);
+      const secondsRemaining = Math.ceil((resetTime - Date.now()) / 1000);
+
+      const message = `Too many requests. Please wait ${secondsRemaining} seconds.`;
+
       throw new ApiError(429, {
         success: false,
-        error: `Rate limit exceeded. ${remaining} requests remaining in this minute.`,
+        error: message,
       });
     }
 
@@ -159,10 +163,8 @@ export class ApiClient {
     // Show user-friendly message
     authStore.setError("Your session has expired. Please log in again.");
 
-    // Redirect to login page after a short delay
-    setTimeout(() => {
-      window.location.href = "/login";
-    }, 1000);
+    // Redirect to login page immediately
+    window.location.href = "/login";
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {

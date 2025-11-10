@@ -8,6 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 const LoginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 type LoginData = z.infer<typeof LoginSchema>;
@@ -20,6 +21,9 @@ const LoginPage = () => {
     formState: { errors, isSubmitting },
   } = useForm<LoginData>({
     resolver: zodResolver(LoginSchema),
+    defaultValues: {
+      rememberMe: true, // Default to remembering users
+    },
   });
 
   // Redirect if already authenticated
@@ -100,8 +104,8 @@ const LoginPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
+                {...register("rememberMe")}
                 id="remember-me"
-                name="remember-me"
                 type="checkbox"
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />

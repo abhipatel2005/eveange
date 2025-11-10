@@ -49,6 +49,15 @@ class RateLimiter {
     const validRequests = requests.filter((time) => now - time < this.windowMs);
     return Math.max(0, this.limit - validRequests.length);
   }
+
+  getResetTime(key: string): number {
+    const requests = this.requests.get(key) || [];
+    if (requests.length === 0) {
+      return Date.now();
+    }
+    // Return when the oldest request will expire
+    return requests[0] + this.windowMs;
+  }
 }
 
 export const apiRateLimiter = new RateLimiter(20, 60000); // 20 requests per minute

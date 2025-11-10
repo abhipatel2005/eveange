@@ -40,6 +40,7 @@ export interface RegistrationForm {
   event_id: string;
   title: string;
   description?: string;
+  form_type?: "registration" | "feedback";
   fields: FormField[];
   is_multi_step: boolean;
   steps?: FormStep[];
@@ -62,6 +63,7 @@ export interface FormTemplate {
 export interface CreateRegistrationFormData {
   title: string;
   description?: string;
+  form_type?: "registration" | "feedback";
   fields: FormField[];
   is_multi_step?: boolean;
   steps?: FormStep[];
@@ -70,6 +72,7 @@ export interface CreateRegistrationFormData {
 export interface UpdateRegistrationFormData {
   title?: string;
   description?: string;
+  form_type?: "registration" | "feedback";
   fields?: FormField[];
   is_multi_step?: boolean;
   steps?: FormStep[];
@@ -93,9 +96,11 @@ export const RegistrationFormService = {
 
   // Get registration form for an event
   async getRegistrationForm(
-    eventId: string
+    eventId: string,
+    formType?: "registration" | "feedback"
   ): Promise<ApiResponse<{ form: RegistrationForm }>> {
-    return apiClient.get(`/registration-forms/events/${eventId}/form`);
+    const params = formType ? `?type=${formType}` : "";
+    return apiClient.get(`/registration-forms/events/${eventId}/form${params}`);
   },
 
   // Update registration form

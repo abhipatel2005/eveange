@@ -7,15 +7,17 @@ import {
   Phone,
   FileText,
   Download,
-  ArrowLeft,
   Users,
   CheckCircle,
   XCircle,
   Clock,
+  X,
 } from "lucide-react";
+import { BackButton } from "../components/common/BackButton";
 import { RegistrationService, Registration } from "../api/registrations";
 import { EventService, Event } from "../api/events";
 import { formatDate } from "../utils/dateUtils";
+import { Loader } from "../components/common/Loader";
 
 const EventRegistrationsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +29,10 @@ const EventRegistrationsPage: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<
     "all" | "confirmed" | "pending" | "cancelled"
   >("all");
+  const [selectedFormData, setSelectedFormData] = useState<{
+    name: string;
+    responses: Record<string, any>;
+  } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -135,11 +141,7 @@ const EventRegistrationsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <Loader size="full" text="Loading registrations..." />;
   }
 
   if (error) {
@@ -170,13 +172,10 @@ const EventRegistrationsPage: React.FC = () => {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <button
+          <BackButton
             onClick={() => navigate(`/events/${id}`)}
-            className="flex items-center text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Event
-          </button>
+            label="Back to Event"
+          />
 
           <button
             onClick={exportToCSV}
@@ -308,16 +307,12 @@ const EventRegistrationsPage: React.FC = () => {
                       Object.keys(registration.responses).length > 0 && (
                         <button
                           onClick={() => {
-                            // Show form data in a modal or expand
-                            alert(
-                              `Form Data:\n${JSON.stringify(
-                                registration.responses,
-                                null,
-                                2
-                              )}`
-                            );
+                            setSelectedFormData({
+                              name: registration.name,
+                              responses: registration.responses || {},
+                            });
                           }}
-                          className="inline-flex items-center p-2 border border-gray-300 rounded-md text-gray-400 hover:text-gray-500"
+                          className="inline-flex items-center p-2 border border-gray-300 rounded-md text-gray-400 hover:text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
                           title="View Form Data"
                         >
                           <FileText className="h-4 w-4" />
@@ -328,6 +323,86 @@ const EventRegistrationsPage: React.FC = () => {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Form Data Modal */}
+      {selectedFormData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Registration Form Data
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {selectedFormData.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedFormData(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {Object.entries(selectedFormData.responses).map(
+                  ([key, value]) => (
+                    <div
+                      key={key}
+                      className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                        {key.replace(/([A-Z])/g, " $1").trim()}
+                      </label>
+                      <div className="text-gray-900">
+                        {typeof value === "object" && value !== null ? (
+                          <pre className="text-sm bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                            {JSON.stringify(value, null, 2)}
+                          </pre>
+                        ) : Array.isArray(value) ? (
+                          <div className="space-y-1">
+                            {value.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="text-sm bg-white px-3 py-2 rounded border border-gray-200"
+                              >
+                                {String(item)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm bg-white px-3 py-2 rounded border border-gray-200">
+                            {String(value)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setSelectedFormData(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

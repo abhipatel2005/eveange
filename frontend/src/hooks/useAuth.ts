@@ -28,7 +28,11 @@ export const useAuth = () => {
         const response = await AuthService.login(data);
 
         if (response.success && response.data) {
-          setAuth(response.data.user, response.data.accessToken);
+          setAuth(
+            response.data.user,
+            response.data.accessToken,
+            data.rememberMe ?? true
+          );
           toast.success("Login successful!");
           navigate("/dashboard");
           return true;

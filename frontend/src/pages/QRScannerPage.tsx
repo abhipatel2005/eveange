@@ -4,6 +4,7 @@ import { Navigate } from "react-router-dom";
 import { EventService, Event } from "../api/events";
 import { CheckInDashboard } from "../components/checkin/CheckInDashboard";
 import { ChevronLeft, Calendar, MapPin, Users } from "lucide-react";
+import { Loader } from "../components/common/Loader";
 
 export default function QRScannerPage() {
   const { user, isLoading } = useAuth();
@@ -15,10 +16,7 @@ export default function QRScannerPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+        <Loader size="lg" text="Loading..." />
       </div>
     );
   }
@@ -97,10 +95,7 @@ export default function QRScannerPage() {
   if (eventsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading events...</p>
-        </div>
+        <Loader size="lg" text="Loading events..." />
       </div>
     );
   }

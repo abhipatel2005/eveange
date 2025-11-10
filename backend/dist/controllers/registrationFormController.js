@@ -36,6 +36,7 @@ const FormFieldSchema = z.object({
 const CreateRegistrationFormSchema = z.object({
     title: z.string().min(1, "Form title is required"),
     description: z.string().optional(),
+    form_type: z.enum(["registration", "feedback"]).default("registration"),
     fields: z.array(FormFieldSchema),
     is_multi_step: z.boolean().default(false),
     steps: z
@@ -83,6 +84,7 @@ export class RegistrationFormController {
                 event_id: eventId,
                 title: validatedData.title,
                 description: validatedData.description || null,
+                form_type: validatedData.form_type || "registration",
                 fields: validatedData.fields,
                 is_multi_step: validatedData.is_multi_step,
                 steps: validatedData.steps || null,
@@ -90,7 +92,34 @@ export class RegistrationFormController {
                 .select("*")
                 .single();
             if (formError) {
+                // Handle unique constraint violation (another form of same event+type exists)
+                // Postgres unique_violation code is '23505'
                 console.error("Registration form creation error:", formError);
+                try {
+                    if (formError.code === "23505" ||
+                        formError.message?.includes("unique")) {
+                        // Fetch existing form for the event and requested type
+                        const { data: existingForm } = await supabase
+                            .from("registration_forms")
+                            .select("*")
+                            .eq("event_id", eventId)
+                            .eq("form_type", validatedData.form_type || "registration")
+                            .order("created_at", { ascending: false })
+                            .limit(1)
+                            .single();
+                        if (existingForm) {
+                            res.status(200).json({
+                                success: true,
+                                message: "Form already exists",
+                                data: { form: existingForm },
+                            });
+                            return;
+                        }
+                    }
+                }
+                catch (fetchErr) {
+                    console.error("Error fetching existing form after unique violation:", fetchErr);
+                }
                 res.status(500).json({
                     success: false,
                     error: "Failed to create registration form",
@@ -123,15 +152,17 @@ export class RegistrationFormController {
     static async getRegistrationForm(req, res) {
         try {
             const { eventId } = req.params;
-            // Get the registration form for this event
+            const formType = req.query.type || "registration"; // Default to registration
+            // Get the registration form for this event by type
             const { data: form, error } = await supabase
                 .from("registration_forms")
                 .select(`
-          id, title, description, fields, is_multi_step, steps, 
+          id, title, description, form_type, fields, is_multi_step, steps, 
           created_at, updated_at,
           event:event_id(id, title, organizer_id)
         `)
                 .eq("event_id", eventId)
+                .eq("form_type", formType)
                 .single();
             if (error || !form) {
                 res.status(404).json({
@@ -199,6 +230,9 @@ export class RegistrationFormController {
                 ...(validatedData.title && { title: validatedData.title }),
                 ...(validatedData.description !== undefined && {
                     description: validatedData.description,
+                }),
+                ...(validatedData.form_type && {
+                    form_type: validatedData.form_type,
                 }),
                 ...(validatedData.fields && { fields: validatedData.fields }),
                 ...(validatedData.is_multi_step !== undefined && {

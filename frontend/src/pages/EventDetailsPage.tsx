@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
@@ -9,9 +9,6 @@ import {
   MapPin,
   Users,
   Clock,
-  ArrowLeft,
-  Settings,
-  Edit,
   UserPlus,
   Award,
   Building,
@@ -20,7 +17,12 @@ import {
   CheckCircle2,
   Share2,
   Plus,
+  MessageSquare,
+  ArrowLeft,
 } from "lucide-react";
+import { Loader } from "../components/common/Loader";
+import { truncateText, isTruncated } from "../utils/textUtils";
+import { ShareEventModal } from "../components/events/ShareEventModal";
 
 const EventDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ const EventDetailsPage: React.FC = () => {
     "about" | "speakers" | "schedule" | "sponsors"
   >("about");
   const [userEventRole, setUserEventRole] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
@@ -178,42 +181,14 @@ const EventDetailsPage: React.FC = () => {
     fetchUserEventRole();
   }, [id, user, accessToken]);
 
-  const handleDelete = async () => {
-    if (!event || !id) return;
-
-    if (
-      confirm(
-        `Are you sure you want to delete "${event.title}"? This action cannot be undone.`
-      )
-    ) {
-      try {
-        const response = await EventService.deleteEvent(id);
-        if (response.success) {
-          navigate("/dashboard");
-        } else {
-          alert(response.error || "Failed to delete event");
-        }
-      } catch (err) {
-        alert("Failed to delete event");
-        if (import.meta.env.DEV) {
-          console.error("Delete event error:", err);
-        }
-      }
-    }
-  };
-
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Link copied to clipboard!");
+    setShowShareModal(true);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading event...</p>
-        </div>
+        <Loader size="lg" text="Loading event..." />
       </div>
     );
   }
@@ -225,10 +200,10 @@ const EventDetailsPage: React.FC = () => {
           <p className="text-red-600 mb-4">{error}</p>
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
+            <ArrowLeft className="w-4 h-4" />
+            <span>Go Back</span>
           </button>
         </div>
       </div>
@@ -293,59 +268,6 @@ const EventDetailsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Fixed Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              <span className="font-medium">Back</span>
-            </button>
-
-            {/* {canManage && (
-              <div className="flex items-center gap-2">
-                <Link
-                  to={`/events/${event.id}/edit`}
-                  className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Edit</span>
-                </Link>
-                <Link
-                  to={`/events/${event.id}/staff`}
-                  className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Staff</span>
-                </Link>
-                <button
-                  onClick={handleDelete}
-                  className="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete Event"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-            )} */}
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <div className="relative bg-gradient-to-br from-primary-600 to-primary-800">
         {event.banner_url ? (
@@ -386,8 +308,15 @@ const EventDetailsPage: React.FC = () => {
         <div className="absolute inset-0 flex items-end">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
             <div className="max-w-4xl">
-              {/* Event Status Badge */}
+              {/* Inline Back Button with Event Status */}
               <div className="flex items-center gap-3 mb-6">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
                 <span
                   className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${
                     isActive
@@ -430,11 +359,18 @@ const EventDetailsPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-start group relative">
                   <MapPin className="w-5 h-5 mr-3 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm opacity-80">Location</div>
-                    <div className="font-semibold">{event.location}</div>
+                    <div className="font-semibold break-words">
+                      {truncateText(event.location, 100)}
+                    </div>
+                    {isTruncated(event.location, 100) && (
+                      <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 w-max max-w-md bg-gray-900 text-white text-sm rounded py-2 px-3 shadow-lg">
+                        {event.location}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -453,8 +389,8 @@ const EventDetailsPage: React.FC = () => {
       </div>
 
       {/* Sticky CTA + Tabs Container */}
-      <div className="bg-white border-b border-gray-200 sticky top-16 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* CTA Row */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-6 text-sm text-gray-600">
@@ -549,11 +485,25 @@ const EventDetailsPage: React.FC = () => {
                   <span>Certificates</span>
                 </Link>
                 <Link
-                  to={`/events/${event.id}/form-builder`}
+                  to={`/events/${event.id}/form-builder?type=registration`}
                   className="flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm font-medium shadow-sm border border-primary-200"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Create Registration Form</span>
+                  <span>Registration Form</span>
+                </Link>
+                <Link
+                  to={`/events/${event.id}/form-builder?type=feedback`}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm font-medium shadow-sm border border-primary-200"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Feedback Form</span>
+                </Link>
+                <Link
+                  to={`/events/${event.id}/feedback-responses`}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm font-medium shadow-sm border border-primary-200"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>View Feedback</span>
                 </Link>
               </div>
             </div>
@@ -861,6 +811,15 @@ const EventDetailsPage: React.FC = () => {
             <StaffManagement eventId={event.id} />
           </div>
         </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareEventModal
+          eventId={event.id}
+          eventTitle={event.title}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

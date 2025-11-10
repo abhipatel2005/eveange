@@ -38,12 +38,21 @@ router.get("/assigned-events", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         console.log("📋 Fetching assigned events for staff user:", userId);
+        // Get optional limit parameter from query
+        const limit = req.query.limit
+            ? parseInt(req.query.limit)
+            : undefined;
         // Get staff assignments first, then fetch events separately
-        const { data: assignments, error: assignmentError } = await supabase
+        let assignmentQuery = supabase
             .from("event_users")
             .select("*")
             .eq("user_id", userId)
             .eq("role", "staff");
+        // Apply limit if provided
+        if (limit && limit > 0) {
+            assignmentQuery = assignmentQuery.limit(limit);
+        }
+        const { data: assignments, error: assignmentError } = await assignmentQuery;
         if (assignmentError) {
             console.error("❌ Error fetching staff assignments:", assignmentError);
             return res.status(500).json({

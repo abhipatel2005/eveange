@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
   Settings,
@@ -7,23 +7,27 @@ import {
   Save,
   Trash2,
   Share2,
-  ArrowLeft,
   Layers,
   FileText,
-  Loader2,
   ChevronUp,
   ChevronDown,
   X,
 } from "lucide-react";
+import { BackButton } from "../components/common/BackButton";
 import { useEventStore } from "../store/eventStore.ts";
 import { useFormBuilderStore } from "../store/formBuilderStore";
-import { FormField } from "../api/registrationForms";
+import { FormField } from "../api/forms";
 import { FormTemplateModal } from "../components/forms/FormTemplateModal.tsx";
 import { ShareFormModal } from "../components/forms/ShareFormModal.tsx";
+import { getTemplatesByType } from "../data/formTemplates";
+import { Loader } from "../components/common/Loader";
 
 export default function RegistrationFormBuilder() {
   const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const formType =
+    (searchParams.get("type") as "registration" | "feedback") || "registration";
 
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -40,7 +44,6 @@ export default function RegistrationFormBuilder() {
   } = useEventStore();
   const {
     form,
-    templates,
     activeFieldId,
     isMultiStep,
     currentStep,
@@ -65,25 +68,36 @@ export default function RegistrationFormBuilder() {
 
   const event = events.find((e: any) => e.id === eventId) || selectedEvent;
 
+  // Get filtered templates based on form type
+  const filteredTemplates = getTemplatesByType(formType);
+
   useEffect(() => {
     if (!eventId) return;
 
     // Load the specific event data
     loadEvent(eventId);
-    // Load form templates
+    // Load form templates (we'll use client-side filtering now)
     loadFormTemplates();
-    // Try to load existing registration form
-    loadRegistrationForm(eventId);
-  }, [eventId]);
+    // Try to load existing form of the correct type
+    loadRegistrationForm(eventId, formType);
+  }, [eventId, formType]);
+
+  // No need for the second useEffect that checks form_type mismatch
+  // since we now load the correct form type from the start
 
   // Debug logging
   const handleCreateForm = async () => {
     if (!eventId) return;
 
-    const title = `${event?.title || "Event"} Registration Form`;
-    const description = `Registration form for ${event?.title || "this event"}`;
+    const isRegistration = formType === "registration";
+    const title = `${event?.title || "Event"} ${
+      isRegistration ? "Registration" : "Feedback"
+    } Form`;
+    const description = `${
+      isRegistration ? "Registration" : "Feedback"
+    } form for ${event?.title || "this event"}`;
 
-    await createRegistrationForm(eventId, title, description);
+    await createRegistrationForm(eventId, title, description, formType);
   };
 
   const handleSaveForm = async () => {
@@ -181,10 +195,7 @@ export default function RegistrationFormBuilder() {
   if (isLoading || eventLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-          <span>Loading form builder...</span>
-        </div>
+        <Loader size="lg" text="Loading form builder..." />
       </div>
     );
   }
@@ -217,15 +228,15 @@ export default function RegistrationFormBuilder() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <button
+              <BackButton
                 onClick={() => navigate("/dashboard")}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
+                label=""
+              />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
-                  Registration Form Builder
+                  {formType === "registration" ? "Registration" : "Feedback"}{" "}
+                  Form Builder
                 </h1>
                 <p className="text-sm text-gray-600">{event?.title}</p>
               </div>
@@ -282,7 +293,10 @@ export default function RegistrationFormBuilder() {
                   >
                     {isSaving ? (
                       <>
-                        <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />
+                        <Loader
+                          size="xs"
+                          className="border-white inline mr-1"
+                        />
                         Saving...
                       </>
                     ) : (
@@ -312,11 +326,17 @@ export default function RegistrationFormBuilder() {
           <div className="text-center py-12">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              No Registration Form
+              No {formType === "registration" ? "Registration" : "Feedback"}{" "}
+              Form
             </h2>
             <p className="text-gray-600 mb-6">
-              Create a registration form for participants to register for your
-              event.
+              Create a{" "}
+              {formType === "registration" ? "registration" : "feedback"} form
+              for{" "}
+              {formType === "registration"
+                ? "participants to register for"
+                : "attendees to provide feedback on"}{" "}
+              your event.
             </p>
             <button
               onClick={handleCreateForm}
@@ -325,13 +345,17 @@ export default function RegistrationFormBuilder() {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                  <Loader size="xs" className="border-white inline mr-2" />
                   Creating...
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 inline mr-2" />
-                  Create Registration Form
+                  Create{" "}
+                  {formType === "registration"
+                    ? "Registration"
+                    : "Feedback"}{" "}
+                  Form
                 </>
               )}
             </button>
@@ -932,7 +956,7 @@ export default function RegistrationFormBuilder() {
       {/* Modals */}
       {showTemplateModal && (
         <FormTemplateModal
-          templates={templates}
+          templates={filteredTemplates}
           onClose={() => setShowTemplateModal(false)}
           onSelect={(template: any) => {
             // Apply the template to the current form

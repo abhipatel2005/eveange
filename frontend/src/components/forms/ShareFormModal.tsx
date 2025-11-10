@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { X, Copy, ExternalLink, Check, Share2, QrCode } from "lucide-react";
 import QRCode from "react-qr-code";
-import type { RegistrationForm } from "../../api/registrationForms";
+import type { Form } from "../../api/forms";
 
 interface ShareFormModalProps {
-  form: RegistrationForm;
+  form: Form;
   eventId: string;
   onClose: () => void;
 }
@@ -17,10 +17,17 @@ export function ShareFormModal({
   const [copied, setCopied] = useState<string | null>(null);
   const [showQRCode, setShowQRCode] = useState(false);
 
-  // Generate URLs (these would be actual URLs in production)
+  // Determine if this is a feedback form or registration form
+  const isFeedbackForm = form.form_type === "feedback";
+  const formTypeLabel = isFeedbackForm ? "Feedback" : "Registration";
+  const formTypeLabelLower = isFeedbackForm ? "feedback" : "register";
+
+  // Generate URLs based on form type
   const baseUrl = window.location.origin;
-  const registrationUrl = `${baseUrl}/events/${eventId}/register`;
-  const embeddedUrl = `${baseUrl}/events/${eventId}/register?embed=true`;
+  const formUrl = isFeedbackForm
+    ? `${baseUrl}/events/${eventId}/register?type=feedback`
+    : `${baseUrl}/events/${eventId}/register`;
+  const embeddedUrl = `${formUrl}&embed=true`;
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -52,7 +59,7 @@ export function ShareFormModal({
               <Share2 className="h-6 w-6 text-blue-600" />
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Share Registration Form
+                  Share {formTypeLabel} Form
                 </h2>
                 <p className="text-sm text-gray-600">{form.title}</p>
               </div>
@@ -70,17 +77,17 @@ export function ShareFormModal({
           {/* Direct Link */}
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-3">
-              Registration Link
+              {formTypeLabel} Link
             </label>
             <div className="flex items-center space-x-3">
               <input
                 type="text"
-                value={registrationUrl}
+                value={formUrl}
                 readOnly
                 className="flex-1 p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-700"
               />
               <button
-                onClick={() => copyToClipboard(registrationUrl, "url")}
+                onClick={() => copyToClipboard(formUrl, "url")}
                 className="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-2"
               >
                 {copied === "url" ? (
@@ -96,7 +103,7 @@ export function ShareFormModal({
                 )}
               </button>
               <a
-                href={registrationUrl}
+                href={formUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-4 py-3 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 flex items-center space-x-2"
@@ -106,7 +113,8 @@ export function ShareFormModal({
               </a>
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              Share this link with participants to register for your event
+              Share this link with participants to {formTypeLabelLower} for your
+              event
             </p>
           </div>
 
@@ -126,7 +134,7 @@ export function ShareFormModal({
                       QR Code for Easy Access
                     </p>
                     <p className="text-sm text-gray-600">
-                      Let participants scan to register quickly
+                      Let participants scan to {formTypeLabelLower} quickly
                     </p>
                   </div>
                 </div>
@@ -143,7 +151,7 @@ export function ShareFormModal({
                   <div className="flex flex-col items-center space-y-4">
                     <div className="qr-code-container bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                       <QRCode
-                        value={registrationUrl}
+                        value={formUrl}
                         size={200}
                         style={{
                           height: "auto",
@@ -155,11 +163,11 @@ export function ShareFormModal({
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-gray-900 mb-1">
-                        Scan to Register
+                        Scan to {isFeedbackForm ? "Give Feedback" : "Register"}
                       </p>
                       <p className="text-xs text-gray-600 max-w-sm mx-auto">
                         Point your camera at this QR code to quickly access the
-                        registration form
+                        {formTypeLabelLower} form
                       </p>
                     </div>
                     <div className="flex space-x-2">
@@ -221,9 +229,7 @@ export function ShareFormModal({
                         Download QR Code
                       </button>
                       <button
-                        onClick={() =>
-                          copyToClipboard(registrationUrl, "qr-url")
-                        }
+                        onClick={() => copyToClipboard(formUrl, "qr-url")}
                         className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 flex items-center space-x-1"
                       >
                         {copied === "qr-url" ? (
@@ -286,7 +292,9 @@ export function ShareFormModal({
             <h4 className="font-medium text-gray-900 mb-2">Form Statistics</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-600">Total Registrations</p>
+                <p className="text-gray-600">
+                  Total {isFeedbackForm ? "Responses" : "Registrations"}
+                </p>
                 <p className="font-semibold text-gray-900">0</p>
               </div>
               <div>

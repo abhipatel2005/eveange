@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { clearAllCaches } from "../utils/cacheInvalidation";
 
 export interface User {
   id: string;
@@ -19,10 +20,11 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  rememberMe: boolean; // Track if user wants to be remembered
 }
 
 interface AuthActions {
-  setAuth: (user: User, accessToken: string) => void;
+  setAuth: (user: User, accessToken: string, rememberMe?: boolean) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -59,15 +61,37 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      rememberMe: true, // Default to true
 
       // Actions
-      setAuth: (user: User, accessToken: string) => {
+      setAuth: (user: User, accessToken: string, rememberMe = true) => {
         set({
           user,
           accessToken,
           isAuthenticated: true,
           error: null,
+          rememberMe,
         });
+
+        // Handle storage based on rememberMe preference
+        const authData = {
+          state: {
+            user,
+            accessToken,
+            isAuthenticated: true,
+            rememberMe,
+          },
+        };
+
+        if (rememberMe) {
+          // Store in localStorage for persistence
+          localStorage.setItem("auth-store", JSON.stringify(authData));
+          sessionStorage.removeItem("auth-store");
+        } else {
+          // Store in sessionStorage for session-only
+          sessionStorage.setItem("auth-store", JSON.stringify(authData));
+          localStorage.removeItem("auth-store");
+        }
       },
 
       clearAuth: () => {
@@ -76,7 +100,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           accessToken: null,
           isAuthenticated: false,
           error: null,
+          rememberMe: true,
         });
+        // Clear both storages to be safe
+        localStorage.removeItem("auth-store");
+        sessionStorage.removeItem("auth-store");
+
+        // Clear all API caches on logout
+        clearAllCaches();
       },
 
       setLoading: (isLoading: boolean) => {
@@ -108,10 +139,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     }),
     {
       name: "auth-store",
+      storage: createJSONStorage(() => localStorage), // Always use localStorage, manually handle sessionStorage
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated,
+        rememberMe: state.rememberMe,
       }),
     }
   )

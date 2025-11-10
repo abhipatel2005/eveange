@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUserPermissions } from "../hooks/useUserPermissions";
+import { Loader } from "./common/Loader";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ export const ProtectedRoute = ({
   if (isLoading || (allowStaff && permissionsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <Loader size="sm" />
       </div>
     );
   }

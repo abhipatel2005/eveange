@@ -3,6 +3,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
 import { CheckInDashboard } from "../checkin/CheckInDashboard";
 import { Users, Calendar, BarChart3, QrCode, AlertCircle } from "lucide-react";
+import { Loader } from "../common/Loader";
 
 interface AssignedEvent {
   id: string;
@@ -77,7 +78,7 @@ export function StaffDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+        <Loader size="xl" />
       </div>
     );
   }

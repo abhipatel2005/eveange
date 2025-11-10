@@ -2,13 +2,18 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { EventService, Event } from "../api/events";
 import { RegistrationService } from "../api/registrations";
-import {
-  RegistrationFormService,
-  RegistrationForm,
-} from "../api/registrationForms";
+import { FormService, Form } from "../api/forms";
 import { useAuthStore } from "../store/authStore";
 import { handleError, ErrorPatterns } from "../utils/errorHandling";
 import { RegistrationFormRenderer } from "../components/forms/RegistrationFormRenderer";
+import { Loader } from "../components/common/Loader";
+import {
+  showErrorToast,
+  showSuccessToast,
+  showLoadingToast,
+  dismissToast,
+} from "../utils/toast";
+import { invalidateDashboardCache } from "../utils/cacheInvalidation";
 
 const RegistrationFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,18 +21,16 @@ const RegistrationFormPage: React.FC = () => {
   const { user } = useAuthStore();
 
   const [event, setEvent] = useState<Event | null>(null);
-  const [registrationForm, setRegistrationForm] =
-    useState<RegistrationForm | null>(null);
+  const [registrationForm, setRegistrationForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const fetchData = async () => {
       if (!id) {
-        setError("Event ID is required");
+        showErrorToast("Event ID is required");
         setLoading(false);
         return;
       }
@@ -38,17 +41,20 @@ const RegistrationFormPage: React.FC = () => {
         // Fetch event details
         const eventResponse = await EventService.getEventById(id);
         if (!eventResponse.success || !eventResponse.data) {
-          setError(eventResponse.error || "Event not found");
+          showErrorToast(eventResponse.error || "Event not found");
           setLoading(false);
           return;
         }
 
         setEvent(eventResponse.data.event);
 
-        // Fetch custom registration form
+        // Fetch custom registration form — allow loading feedback via ?type=feedback
         try {
-          const formResponse =
-            await RegistrationFormService.getRegistrationForm(id);
+          const searchParams = new URLSearchParams(window.location.search);
+          const typeParam =
+            (searchParams.get("type") as "registration" | "feedback") ||
+            undefined;
+          const formResponse = await FormService.getForm(id, typeParam);
           if (formResponse.success && formResponse.data) {
             setRegistrationForm(formResponse.data.form);
           }
@@ -76,7 +82,7 @@ const RegistrationFormPage: React.FC = () => {
           }
         }
       } catch (err) {
-        setError("Failed to load event details");
+        showErrorToast(err);
         console.error("Registration form error:", err);
       } finally {
         setLoading(false);
@@ -94,17 +100,31 @@ const RegistrationFormPage: React.FC = () => {
     e.preventDefault();
     if (!event || !id || !user) return;
 
+    // Check if this is a feedback form
+    const isFeedbackForm = registrationForm?.form_type === "feedback";
+    let toastId: string | undefined;
+
     try {
       setSubmitting(true);
-      setError(null);
+      toastId = showLoadingToast(
+        isFeedbackForm ? "Submitting feedback..." : "Registering for event..."
+      );
 
       const response = await RegistrationService.registerForEvent(id, {
         formData: formData,
       });
 
       if (response.success && response.data) {
-        // Check if payment is required
-        if (response.data.requiresPayment) {
+        dismissToast(toastId);
+
+        // Invalidate dashboard cache so new registration appears immediately
+        invalidateDashboardCache();
+
+        // Feedback forms don't require payment
+        if (!isFeedbackForm && response.data.requiresPayment) {
+          showSuccessToast(
+            "Registration successful! Redirecting to payment..."
+          );
           // Navigate to payment page with registration data
           navigate(`/events/${id}/payment`, {
             state: {
@@ -114,18 +134,31 @@ const RegistrationFormPage: React.FC = () => {
             },
           });
         } else {
+          const successMessage = isFeedbackForm
+            ? "Thank you for your feedback!"
+            : "Successfully registered for the event!";
+          showSuccessToast(successMessage);
           navigate(`/events/${id}`, {
-            state: { message: "Successfully registered for the event!" },
+            state: {
+              message: successMessage,
+            },
           });
         }
       } else {
-        setError(response.error || "Failed to register for event");
+        dismissToast(toastId);
+        showErrorToast(
+          response.error ||
+            `Failed to ${
+              isFeedbackForm ? "submit feedback" : "register for event"
+            }`
+        );
       }
     } catch (err) {
+      if (toastId) dismissToast(toastId);
       // Use the new error handling utility for consistent, user-friendly messages
       const errorMessage = handleError(err, ErrorPatterns.REGISTRATION);
-      setError(errorMessage);
-      console.error("Registration error:", err);
+      showErrorToast(errorMessage);
+      console.error("Form submission error:", err);
     } finally {
       setSubmitting(false);
     }
@@ -135,18 +168,17 @@ const RegistrationFormPage: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading registration form...</p>
+          <Loader size="md" text="Loading registration form..." />
         </div>
       </div>
     );
   }
 
-  if (error || !event) {
+  if (!event) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-8">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-gray-600 mb-4">Event not found</p>
           <button
             onClick={() => navigate(-1)}
             className="text-primary-600 hover:text-primary-700 font-medium"
@@ -187,7 +219,12 @@ const RegistrationFormPage: React.FC = () => {
     );
   }
 
-  if (isRegistered) {
+  // Check if this is a feedback form
+  const isFeedbackForm = registrationForm?.form_type === "feedback";
+
+  // Don't show "already registered" message for feedback forms
+  // Feedback can be submitted multiple times
+  if (isRegistered && !isFeedbackForm) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-8">
@@ -231,7 +268,8 @@ const RegistrationFormPage: React.FC = () => {
     registrationDeadline && new Date() > registrationDeadline;
   const hasStarted = new Date() > startDate;
 
-  if (isDeadlinePassed || hasStarted) {
+  // Only check deadlines for registration forms, not feedback forms
+  if (!isFeedbackForm && (isDeadlinePassed || hasStarted)) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-8">
@@ -279,7 +317,7 @@ const RegistrationFormPage: React.FC = () => {
         </button>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Register for Event
+          {isFeedbackForm ? "Share Your Feedback" : "Register for Event"}
         </h1>
         <h2 className="text-xl text-gray-700 mb-4">{event.title}</h2>
 
@@ -339,12 +377,6 @@ const RegistrationFormPage: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
-
       {/* Registration Form */}
       <form onSubmit={onSubmit} className="space-y-6">
         {registrationForm ? (
@@ -378,15 +410,15 @@ const RegistrationFormPage: React.FC = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-3 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {submitting ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
-                Registering...
+                <Loader size="xs" className="border-white mr-2" />
+                {isFeedbackForm ? "Submitting..." : "Registering..."}
               </>
             ) : (
-              <>Register for Event</>
+              <>{isFeedbackForm ? "Submit Feedback" : "Register for Event"}</>
             )}
           </button>
         </div>

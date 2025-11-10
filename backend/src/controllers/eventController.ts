@@ -510,7 +510,12 @@ export class EventController {
         return;
       }
 
-      const { data: events, error } = await supabase
+      // Get optional limit parameter from query
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string)
+        : undefined;
+
+      let query = supabase
         .from("events")
         .select(
           `
@@ -523,6 +528,13 @@ export class EventController {
         )
         .eq("organizer_id", userId)
         .order("created_at", { ascending: false });
+
+      // Apply limit if provided
+      if (limit && limit > 0) {
+        query = query.limit(limit);
+      }
+
+      const { data: events, error } = await query;
 
       if (error) {
         console.error("Get my events error:", error);

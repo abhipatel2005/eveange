@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { StripePaymentGateway } from "../components/payment/StripePaymentGateway";
 import { toast } from "react-hot-toast";
+import { Loader } from "../components/common/Loader";
 
 interface LocationState {
   registration: {
@@ -48,14 +49,12 @@ export function PaymentPage() {
     setPaymentCompleted(true);
     toast.success("Payment completed successfully!");
 
-    // Navigate to ticket page or event details
-    setTimeout(() => {
-      navigate(`/ticket/${state.registration.id}`, {
-        state: {
-          message: "Payment completed! Your registration is confirmed.",
-        },
-      });
-    }, 2000);
+    // Navigate to ticket page immediately
+    navigate(`/ticket/${state.registration.id}`, {
+      state: {
+        message: "Payment completed! Your registration is confirmed.",
+      },
+    });
   };
 
   const handlePaymentError = (errorMessage: string) => {
@@ -74,10 +73,7 @@ export function PaymentPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Preparing payment...</p>
-        </div>
+        <Loader size="lg" text="Preparing payment..." />
       </div>
     );
   }
@@ -115,7 +111,7 @@ export function PaymentPage() {
           <p className="text-gray-600 mb-4">
             Your registration is confirmed. Redirecting to your ticket...
           </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="sm" />
         </div>
       </div>
     );

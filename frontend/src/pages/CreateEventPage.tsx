@@ -8,6 +8,14 @@ import { useAuth } from "../hooks/useAuth";
 import { UserService } from "../api/user";
 import MapLocationPicker from "../components/ui/MapLocationPicker";
 import { OrganizerUpgradeModal } from "../components/modals/OrganizerUpgradeModal";
+import { Loader } from "../components/common/Loader";
+import {
+  showErrorToast,
+  showSuccessToast,
+  showLoadingToast,
+  dismissToast,
+} from "../utils/toast";
+import { invalidateDashboardCache } from "../utils/cacheInvalidation";
 
 const CreateEventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -33,7 +41,6 @@ const CreateEventPage: React.FC = () => {
   // Allow all users, but require org name and phone number
   const needsProfileInfo = !user?.organizationName || !user?.phoneNumber;
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [locationData, setLocationData] = useState<
     | {
@@ -86,26 +93,29 @@ const CreateEventPage: React.FC = () => {
   const isPaid = watch("isPaid");
 
   const onSubmit = async (data: CreateEventFormData) => {
+    let toastId: string | undefined;
     try {
-      setIsLoading(true);
-      setError(null);
-
       // Validate dates
       const startDate = new Date(data.startDate);
       const endDate = new Date(data.endDate);
 
       if (endDate <= startDate) {
-        setError("End date must be after start date");
+        showErrorToast("End date must be after start date");
         return;
       }
 
       if (data.registrationDeadline) {
         const registrationDeadline = new Date(data.registrationDeadline);
         if (registrationDeadline >= startDate) {
-          setError("Registration deadline must be before the event start date");
+          showErrorToast(
+            "Registration deadline must be before the event start date"
+          );
           return;
         }
       }
+
+      setIsLoading(true);
+      toastId = showLoadingToast("Creating event...");
 
       const eventData = {
         title: data.title,
@@ -126,12 +136,20 @@ const CreateEventPage: React.FC = () => {
       const response = await EventService.createEvent(eventData);
 
       if (response.success && response.data) {
+        dismissToast(toastId);
+        showSuccessToast("Event created successfully!");
+
+        // Invalidate dashboard cache so new event appears immediately
+        invalidateDashboardCache();
+
         navigate(`/events/${response.data.event.id}`);
       } else {
-        setError(response.error || "Failed to create event");
+        dismissToast(toastId);
+        showErrorToast(response.error || "Failed to create event");
       }
     } catch (err) {
-      setError("Failed to create event. Please try again.");
+      if (toastId) dismissToast(toastId);
+      showErrorToast(err);
       console.error("Create event error:", err);
     } finally {
       setIsLoading(false);
@@ -153,302 +171,286 @@ const CreateEventPage: React.FC = () => {
 
       {/* Show form only if user has org/phone and modal is not showing */}
       {!showUpgradeModal && !needsProfileInfo && (
-        <>
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
+          {/* Basic Information */}
+          <div className="form-section">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Basic Information
+            </h2>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
-            {/* Basic Information */}
-            <div className="form-section">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Basic Information
-              </h2>
-
-              <div>
-                <label htmlFor="title" className="form-label">
-                  Event Title *
-                </label>
-                <input
-                  {...register("title")}
-                  type="text"
-                  id="title"
-                  className={`input ${errors.title ? "border-red-500" : ""}`}
-                  placeholder="Enter event title"
-                />
-                {errors.title && (
-                  <p className="form-error">{errors.title.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="description" className="form-label">
-                  Description *
-                </label>
-                <textarea
-                  {...register("description")}
-                  id="description"
-                  rows={4}
-                  className={`input ${
-                    errors.description ? "border-red-500" : ""
-                  }`}
-                  placeholder="Describe your event"
-                />
-                {errors.description && (
-                  <p className="form-error">{errors.description.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="location" className="form-label">
-                  Event Location *
-                </label>
-                <MapLocationPicker
-                  value={locationData}
-                  onChange={(location) => {
-                    setLocationData(location);
-                    setValue("location", location.address);
-                    setValue("latitude", location.latitude);
-                    setValue("longitude", location.longitude);
-                  }}
-                  placeholder="Search for event location..."
-                  className="mt-1"
-                />
-                {errors.location && (
-                  <p className="form-error">{errors.location.message}</p>
-                )}
-
-                {/* Hidden inputs for form validation */}
-                <input type="hidden" {...register("location")} />
-                <input
-                  type="hidden"
-                  {...register("latitude", { valueAsNumber: true })}
-                />
-                <input
-                  type="hidden"
-                  {...register("longitude", { valueAsNumber: true })}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="bannerUrl" className="form-label">
-                  Banner Image URL
-                </label>
-                <input
-                  {...register("bannerUrl")}
-                  type="url"
-                  id="bannerUrl"
-                  className={`input ${
-                    errors.bannerUrl ? "border-red-500" : ""
-                  }`}
-                  placeholder="https://example.com/banner.jpg"
-                />
-                {errors.bannerUrl && (
-                  <p className="form-error">{errors.bannerUrl.message}</p>
-                )}
-              </div>
+            <div>
+              <label htmlFor="title" className="form-label">
+                Event Title *
+              </label>
+              <input
+                {...register("title")}
+                type="text"
+                id="title"
+                className={`input ${errors.title ? "border-red-500" : ""}`}
+                placeholder="Enter event title"
+              />
+              {errors.title && (
+                <p className="form-error">{errors.title.message}</p>
+              )}
             </div>
 
-            {/* Date and Time */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Date & Time
-              </h2>
+            <div>
+              <label htmlFor="description" className="form-label">
+                Description *
+              </label>
+              <textarea
+                {...register("description")}
+                id="description"
+                rows={4}
+                className={`input ${
+                  errors.description ? "border-red-500" : ""
+                }`}
+                placeholder="Describe your event"
+              />
+              {errors.description && (
+                <p className="form-error">{errors.description.message}</p>
+              )}
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="startDate"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Start Date & Time *
-                  </label>
-                  <input
-                    {...register("startDate")}
-                    type="datetime-local"
-                    id="startDate"
-                    className={`input ${
-                      errors.startDate ? "border-red-500" : ""
-                    }`}
-                  />
-                  {errors.startDate && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.startDate.message}
-                    </p>
-                  )}
-                </div>
+            <div>
+              <label htmlFor="location" className="form-label">
+                Event Location *
+              </label>
+              <MapLocationPicker
+                value={locationData}
+                onChange={(location) => {
+                  setLocationData(location);
+                  setValue("location", location.address);
+                  setValue("latitude", location.latitude);
+                  setValue("longitude", location.longitude);
+                }}
+                placeholder="Search for event location..."
+                className="mt-1"
+              />
+              {errors.location && (
+                <p className="form-error">{errors.location.message}</p>
+              )}
 
-                <div>
-                  <label
-                    htmlFor="endDate"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    End Date & Time *
-                  </label>
-                  <input
-                    {...register("endDate")}
-                    type="datetime-local"
-                    id="endDate"
-                    className={`input ${
-                      errors.endDate ? "border-red-500" : ""
-                    }`}
-                  />
-                  {errors.endDate && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.endDate.message}
-                    </p>
-                  )}
-                </div>
+              {/* Hidden inputs for form validation */}
+              <input type="hidden" {...register("location")} />
+              <input
+                type="hidden"
+                {...register("latitude", { valueAsNumber: true })}
+              />
+              <input
+                type="hidden"
+                {...register("longitude", { valueAsNumber: true })}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="bannerUrl" className="form-label">
+                Banner Image URL
+              </label>
+              <input
+                {...register("bannerUrl")}
+                type="url"
+                id="bannerUrl"
+                className={`input ${errors.bannerUrl ? "border-red-500" : ""}`}
+                placeholder="https://example.com/banner.jpg"
+              />
+              {errors.bannerUrl && (
+                <p className="form-error">{errors.bannerUrl.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Date and Time */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900">Date & Time</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="startDate"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Start Date & Time *
+                </label>
+                <input
+                  {...register("startDate")}
+                  type="datetime-local"
+                  id="startDate"
+                  className={`input ${
+                    errors.startDate ? "border-red-500" : ""
+                  }`}
+                />
+                {errors.startDate && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.startDate.message}
+                  </p>
+                )}
               </div>
 
               <div>
                 <label
-                  htmlFor="registrationDeadline"
+                  htmlFor="endDate"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Registration Deadline
+                  End Date & Time *
                 </label>
                 <input
-                  {...register("registrationDeadline")}
+                  {...register("endDate")}
                   type="datetime-local"
-                  id="registrationDeadline"
-                  className="input"
+                  id="endDate"
+                  className={`input ${errors.endDate ? "border-red-500" : ""}`}
                 />
-                <p className="mt-1 text-sm text-gray-500">
-                  Optional: Set a deadline for registrations
-                </p>
+                {errors.endDate && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.endDate.message}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Capacity and Settings */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Event Settings
-              </h2>
+            <div>
+              <label
+                htmlFor="registrationDeadline"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Registration Deadline
+              </label>
+              <input
+                {...register("registrationDeadline")}
+                type="datetime-local"
+                id="registrationDeadline"
+                className="input"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Optional: Set a deadline for registrations
+              </p>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Capacity and Settings */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Event Settings
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="capacity"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Maximum Capacity *
+                </label>
+                <input
+                  {...register("capacity", { valueAsNumber: true })}
+                  type="number"
+                  id="capacity"
+                  min="1"
+                  className={`input ${errors.capacity ? "border-red-500" : ""}`}
+                />
+                {errors.capacity && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.capacity.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="visibility"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Event Visibility *
+                </label>
+                <select
+                  {...register("visibility")}
+                  id="visibility"
+                  className="input"
+                >
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                  <option value="invite-only">Invite Only</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Pricing */}
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <input
+                  {...register("isPaid")}
+                  type="checkbox"
+                  id="isPaid"
+                  className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+                <label
+                  htmlFor="isPaid"
+                  className="ml-2 text-sm font-medium text-gray-700"
+                >
+                  This is a paid event
+                </label>
+              </div>
+
+              {isPaid && (
                 <div>
                   <label
-                    htmlFor="capacity"
+                    htmlFor="price"
                     className="block text-sm font-medium text-gray-700 mb-1"
                   >
-                    Maximum Capacity *
+                    Ticket Price *
                   </label>
-                  <input
-                    {...register("capacity", { valueAsNumber: true })}
-                    type="number"
-                    id="capacity"
-                    min="1"
-                    className={`input ${
-                      errors.capacity ? "border-red-500" : ""
-                    }`}
-                  />
-                  {errors.capacity && (
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                      $
+                    </span>
+                    <input
+                      {...register("price", { valueAsNumber: true })}
+                      type="number"
+                      id="price"
+                      min="0"
+                      step="0.5"
+                      className={`input pl-8 ${
+                        errors.price ? "border-red-500" : ""
+                      }`}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  {errors.price && (
                     <p className="mt-1 text-sm text-red-600">
-                      {errors.capacity.message}
+                      {errors.price.message}
                     </p>
                   )}
                 </div>
+              )}
+            </div>
+          </div>
 
-                <div>
-                  <label
-                    htmlFor="visibility"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Event Visibility *
-                  </label>
-                  <select
-                    {...register("visibility")}
-                    id="visibility"
-                    className="input"
-                  >
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
-                    <option value="invite-only">Invite Only</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div className="space-y-4">
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-4 pt-6 border-t">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="btn btn-secondary"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isLoading}
+            >
+              {isLoading ? (
                 <div className="flex items-center">
-                  <input
-                    {...register("isPaid")}
-                    type="checkbox"
-                    id="isPaid"
-                    className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                  />
-                  <label
-                    htmlFor="isPaid"
-                    className="ml-2 text-sm font-medium text-gray-700"
-                  >
-                    This is a paid event
-                  </label>
+                  <Loader size="xs" className="border-white mr-2" />
+                  Creating...
                 </div>
-
-                {isPaid && (
-                  <div>
-                    <label
-                      htmlFor="price"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Ticket Price *
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                        $
-                      </span>
-                      <input
-                        {...register("price", { valueAsNumber: true })}
-                        type="number"
-                        id="price"
-                        min="0"
-                        step="0.5"
-                        className={`input pl-8 ${
-                          errors.price ? "border-red-500" : ""
-                        }`}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    {errors.price && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {errors.price.message}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="flex justify-end space-x-4 pt-6 border-t">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="btn btn-secondary"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creating...
-                  </div>
-                ) : (
-                  "Create Event"
-                )}
-              </button>
-            </div>
-          </form>
-        </>
+              ) : (
+                "Create Event"
+              )}
+            </button>
+          </div>
+        </form>
       )}
 
       {/* Organizer Upgrade Modal */}

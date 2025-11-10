@@ -808,14 +808,16 @@ export class EmailService {
      * Send certificate email with certificate attachment
      */
     static async sendCertificateEmail(participantEmail, participantName, eventTitle, certificateUrl, certificateCode, verificationCode, customMessage, userEmail, userAccessToken, userRefreshToken) {
+        // Get frontend URL from environment
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
         // Get certificate attachment from Azure Blob Storage
         let certificateAttachment = null;
-        console.log(`🔍 Certificate URL received: ${certificateUrl}`);
+        // console.log(`🔍 Certificate URL received: ${certificateUrl}`);
         if (certificateUrl &&
             (certificateUrl.includes("blob.core.windows.net") ||
                 certificateUrl.includes("sig="))) {
             try {
-                console.log(`📎 Downloading certificate from Azure for attachment...`);
+                // console.log(`📎 Downloading certificate from Azure for attachment...`);
                 // Extract filename from Azure URL (handle both regular and SAS URLs)
                 const urlParts = certificateUrl.split("/");
                 let fileName = urlParts[urlParts.length - 1];
@@ -881,7 +883,7 @@ export class EmailService {
         try {
             // First try SMTP approach
             const transporter = await getTransporter(userEmail, userAccessToken, userRefreshToken);
-            const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage);
+            const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage, frontendUrl);
             const fromEmail = userEmail || process.env.FROM_EMAIL || "noreply@eventplatform.com";
             const subject = `🎉 Your Certificate for ${eventTitle}`;
             const mailOptions = {
@@ -922,7 +924,7 @@ export class EmailService {
             if (userEmail && userAccessToken) {
                 try {
                     console.log("🔄 Attempting certificate email via Gmail API...");
-                    const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage);
+                    const htmlContent = this.generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage, frontendUrl);
                     await sendEmailViaGmailAPI(userEmail, userAccessToken, userRefreshToken || "", participantEmail, `🎉 Your Certificate for ${eventTitle}`, htmlContent, certificateAttachment || undefined);
                     console.log("✅ Certificate email sent successfully via Gmail API");
                     return true;
@@ -941,7 +943,8 @@ export class EmailService {
     /**
      * Generate certificate email template
      */
-    static generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage) {
+    static generateCertificateEmailTemplate(participantName, eventTitle, certificateCode, verificationCode, customMessage, frontendUrl) {
+        const baseUrl = frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
         return `
       <!DOCTYPE html>
     <html lang="en">
@@ -1046,8 +1049,8 @@ export class EmailService {
                   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 35px;">
                     <tr>
                       <td align="center">
-                        <a href="#" style="display: inline-block; background: #fbbf24; color: #1e293b; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
-                          Verify Certificate
+                        <a href="${baseUrl}/dashboard" style="display: inline-block; background: #fbbf24; color: #1e293b; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                          View Dashboard
                         </a>
                       </td>
                     </tr>

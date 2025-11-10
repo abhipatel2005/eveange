@@ -1,5 +1,5 @@
 import { X, FileText, Users, Briefcase } from "lucide-react";
-import type { FormTemplate } from "../../api/registrationForms";
+import type { FormTemplate } from "../../api/forms";
 
 interface FormTemplateModalProps {
   templates: FormTemplate[];

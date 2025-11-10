@@ -1,15 +1,15 @@
 import { create } from "zustand";
 import {
-  RegistrationFormService,
-  type RegistrationForm,
+  FormService,
+  type Form,
   type FormField,
   type FormTemplate,
   type FormStep,
-} from "../api/registrationForms";
+} from "../api/forms";
 
 interface FormBuilderState {
   // Form data
-  form: RegistrationForm | null;
+  form: Form | null;
   templates: FormTemplate[];
 
   // Builder state
@@ -22,7 +22,7 @@ interface FormBuilderState {
   isSaving: boolean;
 
   // Actions
-  setForm: (form: RegistrationForm | null) => void;
+  setForm: (form: Form | null) => void;
   setTemplates: (templates: FormTemplate[]) => void;
   setActiveFieldId: (fieldId: string | null) => void;
   setIsMultiStep: (isMultiStep: boolean) => void;
@@ -45,12 +45,30 @@ interface FormBuilderState {
 
   // API actions
   loadFormTemplates: () => Promise<void>;
-  loadRegistrationForm: (eventId: string) => Promise<void>;
+  loadForm: (
+    eventId: string,
+    formType: "registration" | "feedback"
+  ) => Promise<void>;
+  saveForm: (eventId: string) => Promise<void>;
+  createForm: (
+    eventId: string,
+    title: string,
+    description: string,
+    formType: "registration" | "feedback"
+  ) => Promise<void>;
+  deleteForm: (eventId: string, formId: string) => Promise<void>;
+
+  // Backward compatibility aliases (deprecated - use loadForm, saveForm, createForm, deleteForm)
+  loadRegistrationForm: (
+    eventId: string,
+    formType?: "registration" | "feedback"
+  ) => Promise<void>;
   saveRegistrationForm: (eventId: string) => Promise<void>;
   createRegistrationForm: (
     eventId: string,
     title: string,
-    description?: string
+    description?: string,
+    formType?: "registration" | "feedback"
   ) => Promise<void>;
   deleteRegistrationForm: (eventId: string, formId: string) => Promise<void>;
 }
@@ -236,7 +254,7 @@ export const useFormBuilderStore = create<FormBuilderState>((set, get) => ({
   loadFormTemplates: async () => {
     try {
       set({ isLoading: true });
-      const response = await RegistrationFormService.getFormTemplates();
+      const response = await FormService.getFormTemplates();
 
       if (response.success && response.data) {
         set({ templates: response.data.templates });
@@ -250,12 +268,10 @@ export const useFormBuilderStore = create<FormBuilderState>((set, get) => ({
     }
   },
 
-  loadRegistrationForm: async (eventId: string) => {
+  loadForm: async (eventId: string, formType: "registration" | "feedback") => {
     try {
       set({ isLoading: true });
-      const response = await RegistrationFormService.getRegistrationForm(
-        eventId
-      );
+      const response = await FormService.getForm(eventId, formType);
 
       if (response.success && response.data) {
         const form = response.data.form;
@@ -265,63 +281,59 @@ export const useFormBuilderStore = create<FormBuilderState>((set, get) => ({
           currentStep: 0,
         });
       } else {
-        console.error("Failed to load registration form:", response.error);
+        console.error("Failed to load form:", response.error);
         set({ form: null });
       }
     } catch (error) {
-      console.error("Error loading registration form:", error);
+      console.error("Error loading form:", error);
       set({ form: null });
     } finally {
       set({ isLoading: false });
     }
   },
 
-  saveRegistrationForm: async (eventId: string) => {
+  saveForm: async (eventId: string) => {
     const { form } = get();
     if (!form) return;
 
     try {
       set({ isSaving: true });
-      const response = await RegistrationFormService.updateRegistrationForm(
-        eventId,
-        form.id,
-        {
-          title: form.title,
-          description: form.description,
-          fields: form.fields,
-          is_multi_step: form.is_multi_step,
-          steps: form.steps,
-        }
-      );
+      const response = await FormService.updateForm(eventId, form.id, {
+        title: form.title,
+        description: form.description,
+        form_type: form.form_type,
+        fields: form.fields,
+        is_multi_step: form.is_multi_step,
+        steps: form.steps,
+      });
 
       if (response.success && response.data) {
         set({ form: response.data.form });
       } else {
-        console.error("Failed to save registration form:", response.error);
+        console.error("Failed to save form:", response.error);
       }
     } catch (error) {
-      console.error("Error saving registration form:", error);
+      console.error("Error saving form:", error);
     } finally {
       set({ isSaving: false });
     }
   },
 
-  createRegistrationForm: async (
+  createForm: async (
     eventId: string,
     title: string,
-    description?: string
+    description: string,
+    formType: "registration" | "feedback"
   ) => {
     try {
       set({ isSaving: true });
-      const response = await RegistrationFormService.createRegistrationForm(
-        eventId,
-        {
-          title,
-          description,
-          fields: [],
-          is_multi_step: false,
-        }
-      );
+      const response = await FormService.createForm(eventId, {
+        title,
+        description,
+        fields: [],
+        is_multi_step: false,
+        form_type: formType,
+      });
 
       if (response.success && response.data) {
         set({
@@ -330,22 +342,19 @@ export const useFormBuilderStore = create<FormBuilderState>((set, get) => ({
           currentStep: 0,
         });
       } else {
-        console.error("Failed to create registration form:", response.error);
+        console.error("Failed to create form:", response.error);
       }
     } catch (error) {
-      console.error("Error creating registration form:", error);
+      console.error("Error creating form:", error);
     } finally {
       set({ isSaving: false });
     }
   },
 
-  deleteRegistrationForm: async (eventId: string, formId: string) => {
+  deleteForm: async (eventId: string, formId: string) => {
     try {
       set({ isLoading: true });
-      const response = await RegistrationFormService.deleteRegistrationForm(
-        eventId,
-        formId
-      );
+      const response = await FormService.deleteForm(eventId, formId);
 
       if (response.success) {
         set({
@@ -355,12 +364,37 @@ export const useFormBuilderStore = create<FormBuilderState>((set, get) => ({
           currentStep: 0,
         });
       } else {
-        console.error("Failed to delete registration form:", response.error);
+        console.error("Failed to delete form:", response.error);
       }
     } catch (error) {
-      console.error("Error deleting registration form:", error);
+      console.error("Error deleting form:", error);
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  // Backward compatibility aliases (delegate to new methods)
+  loadRegistrationForm: async (
+    eventId: string,
+    formType: "registration" | "feedback" = "registration"
+  ) => {
+    return get().loadForm(eventId, formType);
+  },
+
+  saveRegistrationForm: async (eventId: string) => {
+    return get().saveForm(eventId);
+  },
+
+  createRegistrationForm: async (
+    eventId: string,
+    title: string,
+    description: string = "",
+    formType: "registration" | "feedback" = "registration"
+  ) => {
+    return get().createForm(eventId, title, description, formType);
+  },
+
+  deleteRegistrationForm: async (eventId: string, formId: string) => {
+    return get().deleteForm(eventId, formId);
   },
 }));

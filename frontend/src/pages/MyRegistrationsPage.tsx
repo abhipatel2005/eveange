@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { RegistrationService } from "../api/registrations";
 import { formatDate } from "../utils/dateUtils.ts";
+import { Loader } from "../components/common/Loader";
+import { truncateText, isTruncated } from "../utils/textUtils";
 
 import { Registration } from "../api/registrations";
 
@@ -120,8 +122,8 @@ const MyRegistrationsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader size="lg" text="Loading your registrations..." />
       </div>
     );
   }
@@ -196,11 +198,18 @@ const MyRegistrationsPage: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       {/* Event Title and Status */}
-                      <div className="flex items-center mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {event.title}
+                      <div className="flex items-center mb-2 flex-wrap gap-2">
+                        <h3
+                          className="text-lg font-semibold text-gray-900 group relative cursor-help"
+                          title={
+                            isTruncated(event.title, 60)
+                              ? event.title
+                              : undefined
+                          }
+                        >
+                          {truncateText(event.title, 60)}
                         </h3>
-                        <div className="ml-3 flex space-x-2">
+                        <div className="flex space-x-2 flex-shrink-0">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                               registration.status
@@ -227,23 +236,42 @@ const MyRegistrationsPage: React.FC = () => {
                       </div>
 
                       {/* Event Description */}
-                      <p className="text-gray-600 mb-4 line-clamp-2">
-                        {event.description}
-                      </p>
+                      <div className="mb-4 group relative">
+                        <p className="text-gray-600 line-clamp-2">
+                          {event.description}
+                        </p>
+                        {event.description &&
+                          event.description.length > 150 && (
+                            <span className="text-primary-600 text-sm cursor-pointer hover:underline">
+                              Read more
+                            </span>
+                          )}
+                      </div>
 
                       {/* Event Details */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-500">
                         <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {formatDate(event.start_date)}
+                          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">
+                            {formatDate(event.start_date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center group relative">
+                          <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">
+                            {truncateText(event.location, 40)}
+                          </span>
+                          {isTruncated(event.location, 40) && (
+                            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 w-max max-w-xs bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-lg">
+                              {event.location}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          {event.location}
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2" />
-                          Registered {formatDate(registration.created_at)}
+                          <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">
+                            Registered {formatDate(registration.created_at)}
+                          </span>
                         </div>
                       </div>
 

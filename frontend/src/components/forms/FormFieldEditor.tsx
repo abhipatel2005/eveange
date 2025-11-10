@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { FormField } from "../../api/registrationForms";
+import type { FormField } from "../../api/forms";
 
 interface FormFieldEditorProps {
   field: FormField;

@@ -6,8 +6,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  RefreshCw,
 } from "lucide-react";
+import { Loader } from "../common/Loader";
 
 interface QRScannerProps {
   onScan: (result: string) => Promise<void>;
@@ -305,7 +305,7 @@ export function QRScanner({
                 <div className="relative">
                   {/* Processing Icon Circle */}
                   <div className="w-32 h-32 rounded-full flex items-center justify-center shadow-2xl bg-blue-500">
-                    <RefreshCw className="w-16 h-16 text-white animate-spin" />
+                    <Loader size="xl" className="border-white" />
                   </div>
 
                   {/* Processing Message Below */}
@@ -415,7 +415,7 @@ export function QRScanner({
           {isPreparingNext ? (
             <div className="mt-3">
               <div className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                <RefreshCw className="w-3 h-3 animate-spin" />
+                <Loader size="xs" />
                 <span>Preparing for next scan</span>
               </div>
             </div>

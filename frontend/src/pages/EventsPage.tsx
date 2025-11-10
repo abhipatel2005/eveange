@@ -4,6 +4,8 @@ import { Calendar, MapPin, Search, Plus, Users, Ticket } from "lucide-react";
 import { EventService, Event } from "../api/events";
 import { RegistrationService, Registration } from "../api/registrations";
 import { useAuth } from "../hooks/useAuth";
+import { Loader } from "../components/common/Loader";
+import { truncateText, isTruncated } from "../utils/textUtils";
 
 const EventsPage: React.FC = () => {
   const { user } = useAuth();
@@ -158,7 +160,9 @@ const EventsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="flex items-center justify-center min-h-64">
+            <Loader size="lg" text="Loading events..." />
+          </div>
           <p className="mt-4 text-gray-600">Loading events...</p>
         </div>
       </div>
@@ -180,69 +184,25 @@ const EventsPage: React.FC = () => {
                 Find amazing events happening around you
               </p>
             </div>
-
-            {/* Search Bar - Positioned beside title */}
-            {/* <div className="flex-1 max-w-md">
-              <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search events..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  Search
-                </button>
-              </form>
-            </div> */}
-
-            {/* Action Buttons */}
-            {/* <div className="flex gap-3">
-              {user && (
-                <Link
-                  to="/my-registrations"
-                  className="inline-flex items-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  My Events
-                </Link>
-              )}
-
-              {user && (user.role === "organizer" || user.role === "admin") && (
-                <Link
-                  to="/events/create"
-                  className="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Event
-                </Link>
-              )}
-            </div> */}
           </div>
 
-          {/* Filters Section - Below title */}
-
+          {/* Searh bar with Filters Section - Below title */}
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex-1">
-              <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <div className="flex-1 max-w-2xl">
+              <form onSubmit={handleSearch} className="flex gap-0">
                 <input
                   type="text"
                   placeholder="Search events..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500"
+                  className="flex-1 px-4 py-2 border border-r-0 border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500 focus:outline-none"
                 />
                 <button
                   type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                  className="px-6 py-2 bg-gray-100 border border-gray-300 rounded-r-lg hover:bg-gray-200 transition-colors flex items-center justify-center"
+                  aria-label="Search"
                 >
-                  Search
+                  <Search className="w-5 h-5 text-gray-600" />
                 </button>
               </form>
             </div>
@@ -394,14 +354,26 @@ const EventsPage: React.FC = () => {
                       </div>
 
                       {/* Title */}
-                      <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                        {event.title}
+                      <h3
+                        className="font-bold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors"
+                        title={
+                          isTruncated(event.title, 80) ? event.title : undefined
+                        }
+                      >
+                        {truncateText(event.title, 80)}
                       </h3>
 
                       {/* Location */}
-                      <div className="flex items-center text-gray-600 text-sm mb-3">
+                      <div className="flex items-center text-gray-600 text-sm mb-3 group relative">
                         <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                        <span className="truncate">{event.location}</span>
+                        <span className="truncate">
+                          {truncateText(event.location, 50)}
+                        </span>
+                        {isTruncated(event.location, 50) && (
+                          <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 w-max max-w-xs bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-lg">
+                            {event.location}
+                          </div>
+                        )}
                       </div>
 
                       {/* Attendees Count */}

@@ -72,10 +72,17 @@ export const RegistrationService = {
   },
 
   // Get user's registrations
-  async getUserRegistrations(): Promise<
-    ApiResponse<{ registrations: Registration[] }>
-  > {
-    return apiClient.get("/registrations/my-registrations");
+  async getUserRegistrations(options?: {
+    limit?: number;
+  }): Promise<ApiResponse<{ registrations: Registration[] }>> {
+    const params = new URLSearchParams();
+    if (options?.limit) {
+      params.append("limit", options.limit.toString());
+    }
+    const url = params.toString()
+      ? `/registrations/my-registrations?${params.toString()}`
+      : "/registrations/my-registrations";
+    return apiClient.get(url);
   },
 
   // Cancel a registration
